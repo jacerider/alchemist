@@ -4,7 +4,7 @@ Drupal.behaviors.alchemist_field_textfield = {
   editors: {},
   attach: function (context, settings) {
     var i, self, alchemist, options;
-    if (!settings.alchemist && !settings.alchemist.textfield) {
+    if (!settings.alchemist || !settings.alchemist.textfield) {
       return;
     }
     self = this;

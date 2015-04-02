@@ -22,7 +22,7 @@ function theme_alchemist_button($vars) {
 
   $element['#attributes']['class'][] = 'alchemist-button';
 
-  // Add Font Awesome Icon
-  fett_icon_button($label, $element);
+  // // Add Font Awesome Icon
+  // fett_icon_button($label, $element);
   return '<button' . drupal_attributes($element['#attributes']) . '>'. $label ."</button>\n"; // This line break adds inherent margin between multiple buttons
 }

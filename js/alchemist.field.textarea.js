@@ -3,10 +3,9 @@
 Drupal.behaviors.alchemist_field_textarea = {
   editors: {},
 
-
   attach: function (context, settings) {
     var i, self, alchemist, options;
-    if (!settings.alchemist && !settings.alchemist.textarea) {
+    if (!settings.alchemist || !settings.alchemist.textarea) {
       return;
     }
     self = this;
@@ -17,7 +16,8 @@ Drupal.behaviors.alchemist_field_textarea = {
     CKEDITOR.plugins.addExternal('alchemistPlaceholder', alchemist.path + '/plugins/ckeditor/alchemistPlaceholder/');
     CKEDITOR.plugins.addExternal('alchemistToolbar', alchemist.path + '/plugins/ckeditor/alchemistToolbar/');
     CKEDITOR.plugins.addExternal('alchemistAsset', alchemist.path + '/plugins/ckeditor/alchemistAsset/');
-    CKEDITOR.config.extraPlugins = 'alchemistPlaceholder,alchemistToolbar,alchemistAsset';
+    CKEDITOR.plugins.addExternal('alchemistLink', alchemist.path + '/plugins/ckeditor/alchemistLink/');
+    CKEDITOR.config.extraPlugins = 'alchemistPlaceholder,alchemistToolbar,alchemistAsset,alchemistLink';
     // CKEDITOR.config.extraAllowedContent = 'div(*)[*]; img(*)[*]; a(*)[*]; i(*); span[!id]; iframe(*)[*]';
     CKEDITOR.config.skin = 'moono-dark,' + alchemist.path + '/plugins/ckeditor/moono-dark/';
 
@@ -26,7 +26,7 @@ Drupal.behaviors.alchemist_field_textarea = {
         return;
       }
       options = alchemist.textarea[i];
-      options.toolbar = [["Format"], ["Bold", "Italic", "-", "Link", "Unlink"], ["JustifyLeft", "JustifyCenter", "JustifyRight", "JustifyBlock"]];
+      options.toolbar = [["Format"], ["Bold", "Italic", "-", "alchemistLink", "Unlink"], ['NumberedList','BulletedList','-','Outdent','Indent','-','Blockquote'], ["JustifyLeft", "JustifyCenter", "JustifyRight"]];
       // options.fillEmptyBlocks = false;
       // CKEDITOR.replace( i, {extraPlugins: 'floating-tools'});
       self.editors[i] = CKEDITOR.inline( document.getElementById( i ), options);

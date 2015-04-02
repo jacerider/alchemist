@@ -5,7 +5,8 @@ Drupal.alchemist = Drupal.alchemist ? Drupal.alchemist : {};
 Drupal.behaviors.alchemist_asset = {
   attach: function (context, settings) {
     var self = this;
-    $('.alchemist-asset-browser .asset-select', context).once().click( self.assetSelect );
+    // context is not used in this selector as it breaks paging
+    $('.alchemist-asset-browser .asset-select').once().click( self.assetSelect );
   },
 
   assetSelect: function ( e ) {
@@ -32,6 +33,10 @@ Drupal.alchemist.insert = function(ajax, response, status){
   var editor = Drupal.alchemist.editor;
   markup = markup.replace(/(\r\n|\n|\r)/gm,"")
   editor.insertHtml(markup);
+  setTimeout(function(){
+    Drupal.attachBehaviors(editor.element.$);
+    editor.fire('focus');
+  },200);
 }
 
 Drupal.alchemist.asset = function(ajax, response, status){

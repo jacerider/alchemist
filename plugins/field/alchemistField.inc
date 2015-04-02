@@ -197,6 +197,8 @@ abstract class alchemistFieldAbstract implements alchemistFieldInterface {
   public function alterFormField(&$element){
     $element['#prefix'] = '<div class="element-hidden">';
     $element['#suffix'] = '</div>';
+    // Make sure ckeditor module never hits this field.
+    $element[$element['#language']][0]['#wysiwyg'] = FALSE;
   }
 
   /**

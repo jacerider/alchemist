@@ -150,7 +150,7 @@
   // right:0;
   // bottom:0;
   width:100%;
-  z-index:1000;
+  z-index:10;
   background:#1c1f21;
   padding:rem-calc(10);
   @include box-shadow(0px 0px 8px rgba(#000, .3));
@@ -158,6 +158,10 @@
 
   .alc-edit{
     float:left;
+  }
+
+  .form-actions{
+    margin:0;
   }
 
   button, button.button, a.button{
@@ -293,13 +297,26 @@
 
 #alchemist-top{
   position:absolute;
-  display:none;
+  visibility:hidden;
   top:0;
   left:0;
 
   &.active{
-    display:block;
-    animation:fadeIn .3s 1;
+    visibility:visible;
+  }
+
+  &.hide{
+    display:none;
+  }
+
+  &.in{
+    visibility:visible;
+    @include animation(fadeIn .3s 1);
+  }
+
+  &.out{
+    visibility:hidden;
+    @include animation(fadeOut .2s 1);
   }
 
   .cke_chrome{
@@ -319,12 +336,27 @@
 
 @include keyframes(fadeIn) {
   from {
+    visibility:visible;
     @include transform(scale(.5));
     opacity:0;
   }
   to {
+    visibility:visible;
     @include transform(scale(1));
     opacity:1;
+  }
+}
+
+@include keyframes(fadeOut) {
+  from {
+    visibility:visible;
+    @include transform(scale(1));
+    opacity:1;
+  }
+  to {
+    visibility:visible;
+    @include transform(scale(.5));
+    opacity:0;
   }
 }
 
@@ -506,18 +538,12 @@
     border-radius: 0;
   }
 
-  #edit-submit,
   .asset-grid-actions{
-    // position:absolute;
-    // bottom:0;
-    // left:0;
-    // right:0;
     display:block;
     width:100%;
     margin:0;
   }
 
-  #edit-submit,
   .asset-grid-actions button{
     display:block;
     width:100%;
@@ -531,7 +557,6 @@
     font-size:rem-calc(20);
   }
 
-  #edit-submit,
   .asset-grid-actions-large button:not(.tiny){
     font-size:rem-calc(30);
   }
@@ -553,54 +578,112 @@
   top:0;
   left:0;
   color:#fff;
-  display:none;
+  // display:none;
+  visibility:hidden;
   line-height:36px;
 
-  &.active{
-    display:block;
-    animation:fadeIn .3s 1;
+  span.alchemist-asset-link{
+    display:inline-block;
+    width:36px;
+    height:36px;
+    border-radius: 18px;
+    overflow:hidden;
+    position:relative;
+    margin:rem-calc(0 0 0 2);
+
+    .ajax-progress-throbber{
+      .throbber{
+        margin-left:rem-calc(-10);
+        margin-top:rem-calc(-15);
+      }
+      .throbber:before{
+        font-size:rem-calc(20);
+        width:rem-calc(20);
+        line-height:rem-calc(20);
+      }
+    }
   }
 
   a{
     background:#3f3f3f;
     color:#fff;
-    display:inline-block;
+    display:block;
     width:36px;
     height:36px;
     text-align: center;
     border-radius: 18px;
     @include box-shadow(0 0 5px #fff);
+    @include transition(background 0.3s);
+
+    &:hover{
+      background:#0997c3;
+    }
   }
 
   #alchemist-assets-toggle{
+    display:inline-block;
     font-size:16px;
+    vertical-align: middle;
     // @include transition(* 200ms ease-in-out 0s);
     @include transform(rotate(0deg));
-    animation:rotateOut .3s 1;
+    @include animation(rotateOut .3s 1);
   }
 
   #alchemist-assets-content{
     display:none;
+    vertical-align: middle;
+    padding: 0;
+    border-radius: 18px;
+    height:36px;
+    visibility:hidden;
+    // overflow:hidden;
+
+    a{
+      font-size:13px;
+    }
   }
 
-  &.show{
+  &.active{
+    visibility:visible;
+  }
+
+  &.hide{
+    display:none;
+  }
+
+  &.in{
+    visibility:visible;
+    @include animation(fadeIn .3s 1);
+  }
+
+  &.out{
+    visibility:hidden;
+    @include animation(fadeOut .3s 1);
+  }
+
+  &.bar-show{
 
     #alchemist-assets-toggle{
       @include transform(rotate(45deg));
-      animation:rotateIn .3s 1;
+      @include animation(rotateIn .3s 1);
+      background: #acb3b6;
     }
 
     #alchemist-assets-content{
-      animation:fadeIn .3s 1;
-      padding: 0 10px;
       display:inline-block;
-
-      a{
-        font-size:13px;
-        margin:0 2px;
-      }
+      visibility:visible;
+      @include animation(fadeIn .3s 1);
     }
 
+  }
+
+  &.bar-hide{
+
+    #alchemist-assets-content{
+      display:inline-block;
+      visibility:hidden;
+      @include animation(fadeOut .3s 1);
+    }
   }
 }
 
@@ -635,27 +718,32 @@ body{
 html,
 body,
 .alc-panel,
-.alc-pusher,
-.alc-content {
+#alc-pusher,
+#alc-content {
   height: 100%;
 }
 
-.alc-content {
+.alc-hide{
+  display:none !important;
+}
+
+#alc-content {
   overflow-y: auto;
   background: #f3efe0;
 }
 
-.alc-content,
-.alc-content-inner {
+#alc-content,
+#alc-content-inner {
   position: relative;
 }
 
 .alc-panel {
   position: relative;
   overflow: hidden;
+  z-index:1;
 }
 
-.alc-pusher {
+#alc-pusher {
   position: relative;
   left: 0;
   z-index: 99;
@@ -663,7 +751,7 @@ body,
   @include transition(transform 0.75s);
 }
 
-.alc-pusher::after {
+#alc-pusher::after {
   position: absolute;
   top: 0;
   right: 0;
@@ -676,7 +764,7 @@ body,
   z-index:2000;
 }
 
-.alc-region-open .alc-pusher::after {
+.alc-region-open #alc-pusher::after {
   width: 100%;
   height: 100%;
   opacity: 1;
@@ -712,6 +800,10 @@ body,
     padding:rem-calc(15);
     // margin:rem-calc(5);
     // background: #333333;
+
+    .columns{
+      position:static;
+    }
   }
 
   .alc-region-content{
@@ -727,6 +819,7 @@ body,
     color:#fff;
     text-shadow:0 1px 5px #000;
 
+    em,
     span{
       font-weight:300;
     }
@@ -740,73 +833,77 @@ body,
     }
   }
 
-  input[type="text"], input[type="password"], input[type="date"], input[type="datetime"], input[type="datetime-local"], input[type="month"], input[type="week"], input[type="email"], input[type="number"], input[type="search"], input[type="tel"], input[type="time"], input[type="url"], textarea{
-    background:#23272a;
-    @include box-shadow(inset 1px 1px 4px 0px rgba(0,0,0,0.25));
-    color:#fff;
-    border:none;
+  // input[type="text"], input[type="password"], input[type="date"], input[type="datetime"], input[type="datetime-local"], input[type="month"], input[type="week"], input[type="email"], input[type="number"], input[type="search"], input[type="tel"], input[type="time"], input[type="url"], textarea{
+  //   background:#23272a;
+  //   @include box-shadow(inset 1px 1px 4px 0px rgba(0,0,0,0.25));
+  //   color:#fff;
+  //   border:none;
+  // }
+
+  // select{
+  //   background:#23272a;
+  //   @include box-shadow(inset 1px 1px 4px 0px rgba(0,0,0,0.25));
+  //   color:#fff;
+  //   border:none;
+  // }
+
+  .pagination{
+    text-align: center;
+    margin:rem-calc(15 0);
+
+    li{
+      display:inline-block;
+      float:none;
+
+      &.current a{
+        background:#0997c3;
+      }
+    }
   }
 
-  select{
-    background:#23272a;
-    @include box-shadow(inset 1px 1px 4px 0px rgba(0,0,0,0.25));
-    color:#fff;
-    border:none;
-  }
-
-  button, button.button, a.button{
-    margin:0;
-    border-radius:rem-calc(3);
-    background:#0997c3;
-    color:#fff;
-    padding:rem-calc(5 10);
-    font-size:rem-calc(12);
-    font-weight:300;
-    @include box-shadow(0px 0px 4px rgba(#000, .2));
-    @include transition(all 0.75s);
-    border-top:1px solid #28b7e5;
-
-    &:hover{
-      background:#28b7e5;
-    }
-
-    &.expand{
-      border-radius:0;
-      padding:rem-calc(10 20);
-      font-size:rem-calc(14);
-      font-weight:400;
-    }
+  .asset-browser .view-content{
+    margin-left:0;
+    margin-right:0;
+    padding-bottom:rem-calc(20);
   }
 
   fieldset.form-wrapper{
     border:none;
-    padding:0;
-    margin:rem-calc(0 0 10);
     background: #2b2f32;
     @include box-shadow(inset 1px 1px 4px 0px rgba(0,0,0,0.25));
     position:relative;
-    padding-top:rem-calc(35);
+    padding:rem-calc(35 10 10);
+
+    fieldset.form-wrapper{
+      margin:rem-calc(0 0 10);
+      padding:rem-calc(35 0 0);
+
+      legend{
+        padding:0;
+      }
+    }
 
     legend{
       background:none;
-      padding:0;
-      width:100%;
       margin:0;
+      width:100%;
       position:absolute;
       top:0;
       left:0;
+      padding:rem-calc(10 10 0);
 
       .fieldset-legend,
       a{
         color:#cccccc;
         font-size:rem-calc(13);
         line-height:rem-calc(13);
-        font-weight:300;
+        font-weight:600;
         text-transform: uppercase;
       }
 
       a{
         color:#0997c3;
+        font-weight:300;
 
         &:hover{
           color:#28b7e5;
@@ -848,8 +945,8 @@ body,
           th{
             border:none;
             font-weight:300;
-            font-size:rem-calc(12);
-            color:#e6e6e6;
+            font-size:rem-calc(11);
+            color:#d3d3d3;
             text-transform: uppercase;
           }
         }
@@ -877,7 +974,7 @@ body,
 
     .fieldset-wrapper{
       // background: #282b2e;
-      padding:0;
+      padding:rem-calc(20 0 0);
       margin:rem-calc(0 0 0);
 
       .form-item{
@@ -886,6 +983,8 @@ body,
     }
 
     &.collapsible{
+      padding-bottom:0;
+
       legend{
         padding:rem-calc(10 0);
       }
@@ -893,6 +992,59 @@ body,
       .fieldset-wrapper{
         padding:rem-calc(0 10 10);
       }
+    }
+  }
+
+  .form-item{
+    background: #2b2f32;
+    @include box-shadow(inset 1px 1px 4px 0px rgba(0,0,0,0.25));
+    padding:rem-calc(10);
+    margin:rem-calc(0 0 10);
+
+    fieldset{
+      background:#24282a;
+    }
+
+    fieldset:last-child{
+      margin-bottom:0;
+    }
+
+    label{
+      font-weight:700;
+      font-size:rem-calc(15);
+      color:#fff;
+      text-transform: uppercase;
+    }
+
+    label.option{
+      font-size:rem-calc(13);
+      line-height:rem-calc(13);
+      font-weight:300;
+      color:#e6e6e6;
+      text-transform: none;
+    }
+
+    li{
+      line-height:rem-calc(22);
+
+      ul{
+        padding-bottom:rem-calc(5);
+      }
+    }
+
+    .description{
+      color:#0997c3;
+      font-size:rem-calc(11);
+    }
+  }
+
+  .form-wrapper,
+  .views-widget{
+    .form-item{
+      margin:0;
+      padding:0;
+      background:none;
+      @include box-shadow(none);
     }
   }
 
@@ -904,6 +1056,10 @@ body,
 
     fieldset.form-wrapper{
       margin:0;
+
+      legend{
+        padding:0;
+      }
     }
 
     // Form wrappers within form wrappers
@@ -928,29 +1084,6 @@ body,
       background:none;
       padding:0;
       margin:0;
-    }
-
-    .form-item{
-      margin:0;
-
-      label{
-        font-weight:700;
-        font-size:rem-calc(15);
-        color:#fff;
-        text-transform: uppercase;
-      }
-
-      label.option{
-        font-size:rem-calc(13);
-        font-weight:300;
-        color:#e6e6e6;
-        text-transform: none;
-      }
-
-      .description{
-        color:#0997c3;
-        font-size:rem-calc(11);
-      }
     }
   }
 }
@@ -983,7 +1116,7 @@ body,
 
 /* Effect Left: Scale down pusher */
 
-.alc-effect-left.alc-region-open .alc-pusher {
+.alc-effect-left.alc-region-open #alc-pusher {
   -webkit-transform: translate3d(rem-calc(600), 0, 0);
   transform: translate3d(rem-calc(600), 0, 0);
 }
@@ -993,14 +1126,6 @@ body,
   visibility: visible;
   -webkit-transform: translate3d(-100%, 0, 0);
   transform: translate3d(-100%, 0, 0);
-
-  // button.expand{
-  //   position:absolute;
-  //   bottom:0;
-  //   left:0;
-  //   right:0;
-  //   width:100%;
-  // }
 }
 
 .alc-effect-left.alc-region-open #alc-region-left {
@@ -1022,12 +1147,12 @@ body,
   @include perspective(1500px);
 }
 
-.alc-effect-top .alc-pusher {
+.alc-effect-top #alc-pusher {
   @include transform-style(preserve-3d);
   // @include transform-origin(50% 100%);
 }
 
-.alc-effect-top.alc-region-open .alc-pusher {
+.alc-effect-top.alc-region-open #alc-pusher {
   // @include transform(translate3d(0, 0, rem-calc(-200)) rotateX(10deg));
   @include transform(translate3d(0, 0, rem-calc(-200)));
 }
@@ -1053,8 +1178,107 @@ body,
 
 
 /* Fallback example for browsers that don't support 3D transforms (and no JS fallback) */
-.no-csstransforms3d .alc-pusher,
-.no-js .alc-pusher {
+.no-csstransforms3d #alc-pusher,
+.no-js #alc-pusher {
   padding-left: rem-calc(600);
 }
 
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Buttons
+////////////////////////////////////////////////////////////////////////////////
+
+.alc-region,
+body.alchemist-processed .ui-dialog {
+
+  button:not(.ui-button), button.button, a.button,
+  #linkit-cancel{
+    margin:0;
+    border-radius:rem-calc(3);
+    background:#0997c3;
+    color:#fff;
+    padding:rem-calc(9 10);
+    font-size:rem-calc(12);
+    font-weight:300;
+    @include box-shadow(0px 0px 4px rgba(#000, .2));
+    @include transition(all 0.75s);
+    border-top:1px solid #28b7e5;
+
+    em,
+    span{
+      color:#fff;
+      font-style: normal;
+      font-weight:300;
+    }
+
+    &:hover,
+    &:active,
+    &:focus{
+      background:#28b7e5;
+    }
+
+    &.expand{
+      border-radius:0;
+      padding:rem-calc(10 20);
+      font-size:rem-calc(14);
+      font-weight:400;
+    }
+
+    &.tiny{
+      font-size:rem-calc(12);
+      padding:rem-calc(4 5);
+      font-weight:300;
+    }
+
+    &.secondary{
+      background:#8b99a4;
+      border-top:1px solid #abbccc;
+      font-weight:400;
+      @include box-shadow(none);
+
+      &:hover{
+        color:#fff;
+        background:#75818c;
+      }
+    }
+
+    &.muted{
+      background:none;
+      border:none;
+      padding:rem-calc(15 0 0);
+      color:#fff;
+      line-height:rem-calc(12);
+      font-weight:300;
+      @include box-shadow(none);
+
+      &:hover,
+      &:active,
+      &:focus{
+        background:none;
+        color:#0997c3;
+      }
+    }
+  }
+
+  button.file-upload-button{
+    padding:0;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// jQuery UI
+////////////////////////////////////////////////////////////////////////////////
+
+body.alchemist-processed{
+  .ui-widget-overlay{
+    background-image:none !important;
+    background:rgba(#000, .5) !important;
+    opacity:1 !important;
+  }
+
+  .ui-dialog{
+
+  }
+}

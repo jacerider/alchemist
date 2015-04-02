@@ -74,7 +74,13 @@ class alchemistField_text_long extends alchemistField {
           'field' => $this->getFieldSelector(),
     )))), 'setting');
     $placeholder = 'Enter '.strtolower($instance['label']).' content here...';
-    $element[0]['#markup'] = '<div id="'.$this->getId().'-editable" class="alchemist-editable '.drupal_html_class($this->getFieldType()).'" data-ph="'.$placeholder.'" contenteditable="true">' . $element[0]['#markup'] . '</div>';
+
+    // Because textareas can have text filters applied to them, we want to use
+    // the unmodified data of the field when editing.
+    $field = $this->getField();
+    $value = $this->getWrapper()->{$field['field_name']}->value();
+
+    $element[0]['#markup'] = '<div id="'.$this->getId().'-editable" class="alc-editable '.drupal_html_class($this->getFieldType()).'" data-ph="'.$placeholder.'" contenteditable="true">' . $value['value'] . '</div>';
     return $element;
   }
 

@@ -50,10 +50,21 @@ function alchemist_element_info() {
     '#button_type' => 'submit',
     '#executes_submit_callback' => TRUE,
     '#limit_validation_errors' => FALSE,
-    '#process' => array('ajax_process_form'),
+    '#process' => array('alchemist_ajax_process_form'),
     '#theme_wrappers' => array('alchemist_button'),
   );
   return $types;
+}
+
+function alchemist_ajax_process_form($element, &$form_state) {
+  $type = $element['#type'];
+  $element['#type'] = 'button';
+  $element = ajax_pre_render_element($element);
+  $element['#type'] = $type;
+  if (!empty($element['#ajax_processed'])) {
+    $form_state['cache'] = TRUE;
+  }
+  return $element;
 }
 
 /**
@@ -142,12 +153,32 @@ function alchemist_menu() {
       'file' => 'alchemist.asset.inc',
       'file path' => drupal_get_path('module', 'alchemist') . '/includes'
     );
+    $items['alchemist/asset/%asset/nojs'] = array(
+      'title' => 'Asset Editor',
+      'page callback' => 'alchemist_asset',
+      'page arguments' => array(2,3),
+      'access callback'  => 'asset_access',
+      'access arguments' => array('edit', 2),
+      'type' => MENU_CALLBACK,
+      'file' => 'alchemist.asset.inc',
+      'file path' => drupal_get_path('module', 'alchemist') . '/includes'
+    );
     // Add menu items to add each different type of entity.
     foreach (asset_get_types() as $type) {
       $items['alchemist/asset/' . $type->type] = array(
         'title' => 'Add ' . $type->name,
         'page callback' => 'alchemist_asset',
         'page arguments' => array(2),
+        'access callback'  => 'asset_access',
+        'access arguments' => array('edit', 2),
+        'type' => MENU_CALLBACK,
+        'file' => 'alchemist.asset.inc',
+        'file path' => drupal_get_path('module', 'alchemist') . '/includes'
+      );
+      $items['alchemist/asset/' . $type->type . '/nojs'] = array(
+        'title' => 'Add ' . $type->name,
+        'page callback' => 'alchemist_asset',
+        'page arguments' => array(2,3),
         'access callback'  => 'asset_access',
         'access arguments' => array('edit', 2),
         'type' => MENU_CALLBACK,
@@ -185,6 +216,16 @@ function alchemist_menu() {
       'access callback'  => TRUE,
       'type' => MENU_CALLBACK,
       'file' => 'alchemist.page.inc',
+      'file path' => drupal_get_path('module', 'alchemist') . '/includes'
+    );
+    // Link
+    $items['alchemist/link'] = array(
+      'title' => 'Link',
+      'page callback' => 'alchemist_link',
+      'theme callback' => 'ajax_base_page_theme',
+      'access arguments' => array('access content'),
+      'type' => MENU_CALLBACK,
+      'file' => 'alchemist.link.inc',
       'file path' => drupal_get_path('module', 'alchemist') . '/includes'
     );
   }
@@ -346,6 +387,7 @@ function alchemist_redirect_create( $type ){
  */
 function ajax_command_alchemist_panel($html, $position, $title = NULL, $settings = NULL) {
   $title = $title ? $title : drupal_get_title();
+  $html = theme('status_messages') . $html;
   return array(
     'command' => 'alchemistPanel',
     'data' => $html,
@@ -477,16 +519,18 @@ function alchemist_create_node($bundle) {
   // entity_create replaces the procedural steps in the first example of
   // creating a new object $node and setting its 'type' and uid property
   $values = array(
-    'nid'     => NULL,
-    'type'    => $bundle,
-    'uid'     => $user->uid,
-    'title'   => '',
-    'created' => time(),
-    'changed' => time(),
-    'status'  => 1,
-    'comment' => 0,
-    'promote' => 0,
-    'is_new'  => 1,
+    'nid'      => NULL,
+    'type'     => $bundle,
+    'uid'      => $user->uid,
+    'name'     => $user->name,
+    'revision' => 0,
+    'title'    => '',
+    'created'  => time(),
+    'changed'  => time(),
+    'status'   => 1,
+    'comment'  => 0,
+    'promote'  => 0,
+    'is_new'   => 1,
   );
   $entity = entity_create('node', $values);
   return $entity;

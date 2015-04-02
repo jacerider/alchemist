@@ -19,17 +19,18 @@
     this.assetBarDimensions = false;
     this.editorPosition = false;
     this.assetBarContentSet = false;
+    this.assetBarDisabled = false;
   };
   var is_locked = false;
   var is_visible = false;
 
-  var alchemistAssetLinkTpl = CKEDITOR.addTemplate( 'alchemistAssetLink', '<a href="{url}" class="alchemist-asset-link use-ajax"><i class="fa fa-{icon}"></i></a>' );
+  var alchemistAssetLinkTpl = CKEDITOR.addTemplate( 'alchemistAssetLink', '<span class="alchemist-asset-link"><a href="{url}" class="use-ajax"><i class="fa fa-{icon}"></i></a></span>' );
 
   // Create parent divs.
   var div = document.createElement('div');
   div.id = 'alchemist-assets';
   div.innerHTML = '<a id="alchemist-assets-toggle"><i class="fa fa-plus"></i></a><div id="alchemist-assets-content"></div>';
-  document.body.appendChild(div);
+  jQuery('#alc-content').append(div);
 
   // Asset bar variables.
   var assetBar = CKEDITOR.document.getById('alchemist-assets');
@@ -54,28 +55,26 @@
 
   var assetBarContentShow = function(){
     assetBar.active = true;
-    assetBar.$.className = assetBar.$.className + ' show';
+    jQuery(assetBar.$).removeClass('bar-hide').addClass('bar-show');
   }
 
   var assetBarContentHide = function(){
     assetBar.active = false;
-    var reg = new RegExp('(\\s|^)show(\\s|$)');
-    assetBar.$.className = assetBar.$.className.replace(reg,'');
+    jQuery(assetBar.$).removeClass('bar-show').addClass('bar-hide');
   }
-
 
   CKEDITOR.plugins.add( 'alchemistAsset', {
     requires: "widget",
     init: function( editor ) {
 
-      editor.filter.allow( 'div[data-*,typeof,about](*); img[!src,alt]; iframe[!src,width,height,frameborder]; ul(*); li; style;', 'Asset' );
+      // editor.filter.allow( 'div[data-*,typeof,about](*); img[!src,alt]; iframe[!src,width,height,frameborder]; ul(*); li; style;', 'Asset' );
+      // editor.filter.allow( 'div[data-*,typeof,about](*); img[!src,alt]; style; i(*);', 'Asset' );
+      editor.filter.allow( 'div[data-*,typeof,about](*); img[!src,alt]; style; icon(*); a(*);', 'Asset' );
 
       editor.getAlchemistData = assets;
 
       editor.on( 'focus', function() {
         editor.alchemistAssets = new alchemistAssets();
-        // Hide asset bar content
-        assetBarContentHide();
         // Hide by default
         position(editor, 'hide');
         // Store active editor
@@ -176,13 +175,22 @@
     showAssetBar = function(){
       var assetBar = getAssetBar();
       setAssetBarContent();
-      assetBar.$.className = 'active';
+      // Don't show if no assets are enabled.
+      if(editor.alchemistAssets.assetBarDisabled){
+        assetBar.$.className = 'hide';
+        return;
+      }
+      assetBar.$.className = 'active in';
       is_visible = true;
     }
 
     hideAssetBar = function(){
       var assetBar = getAssetBar();
-      assetBar.$.className = '';
+      // Don't hide if no assets are enabled.
+      if(editor.alchemistAssets.assetBarDisabled) return;
+      // Hide asset bar content
+      assetBarContentHide();
+      assetBar.$.className = 'active out';
       is_visible = false;
     }
 
@@ -195,15 +203,13 @@
      * Get position and dimensions of an element.
      */
     getElementPosition = function(e){
+      var content = jQuery('#alc-content');
       var obj = e.$, xPosition = 0, yPosition = 0;
       var height = obj.offsetHeight, width = obj.offsetWidth;
-
-      while(obj) {
-        xPosition += (obj.offsetLeft - obj.scrollLeft + obj.clientLeft);
-        yPosition += (obj.offsetTop - obj.scrollTop + obj.clientTop);
-        obj = obj.offsetParent;
-      }
-      return { left: xPosition, top: yPosition, height: height, width: width};
+      var offset = jQuery(obj).offset();
+      var offsetTop = offset.top + content.scrollTop();
+      var offsetLeft = offset.left + content.scrollLeft();
+      return { left: offset.left, top: offsetTop, height: height, width: width};
     }
 
     /**
@@ -240,7 +246,7 @@
     calculatePosition = function(selectionPosition, assetBarDimensions, editorPosition){
       var toolpos = {
         x: (selectionPosition.left - assetBarDimensions.width) - 10,
-        y: selectionPosition.top - (assetBarDimensions.height / 4),
+        y: selectionPosition.top - (assetBarDimensions.height / 4) + 5,
       }
 
       if(toolpos.x < 0){
@@ -284,7 +290,9 @@
             } ) ) );
           }
           Drupal.attachBehaviors(assetBarContent.$, Drupal.settings);
-          // $assetBarContent.html(editor.id);
+        }
+        else{
+          editor.alchemistAssets.assetBarDisabled = true;
         }
       }
     }
@@ -309,6 +317,9 @@
     // Strip out last hanging empty <p> tag.
     var regex = new RegExp('.*(<p>(\s|&nbsp;|<\/?\s?br\s?\/?>)*<\/?p>[\n\r\f])(?![\f\n\r])');
     data = data.replace(regex, '');
+    var regex = new RegExp('^(<p>\[.*\](\s)*<\/p>)$');
+    var asdf = data.replace(regex, '$1');
+    console.log(asdf);
     // Replace tokens
     var $data = jQuery('<div></div>').append(data);
     jQuery('.entity-asset', $data).each(function(){

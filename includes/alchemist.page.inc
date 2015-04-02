@@ -24,7 +24,7 @@ function alchemist_page_edit($node, $alchemist_id = NULL, $view_mode = 'full', $
   $alchemist_id = alchemist_get_id($node, $alchemist_id);
 
   // Tell asset module we want to use preview mode.
-  $node->asset_preview = 'asset_preview';
+  $node->asset_preview = TRUE;
 
   // Check to see if we have a current draft and load in working node.
   $draft = FALSE;
@@ -93,11 +93,23 @@ function alchemist_page_form($form, &$form_state, $alchemist_id, $langcode, $var
   // Contains node, fields
   extract($vars);
 
+  // Prepare node
+  node_object_prepare($node);
+
   $form_state['node'] = $node;
   $form_state['alchemist_id'] = $alchemist_id;
   $form['#id'] = 'alchemist-page-form';
 
   field_attach_form('node', $node, $form, $form_state, $langcode);
+
+  form_load_include($form_state, 'inc', 'node', 'node.pages');
+  $form += node_form($form, $form_state, $node);
+  unset($form['additional_settings']['#type']);
+
+  // Run alter hooks as if we were the actual node form.
+  $form_id = 'form_'.$node->type.'_node_form';
+  $hooks = array('form', 'form_node_form', 'form_'.$node->type.'_node_form');
+  drupal_alter($hooks, $form, $form_state, $form_id);
 
   foreach(element_children($form) as $id){
     $element = &$form[$id];
@@ -105,9 +117,28 @@ function alchemist_page_form($form, &$form_state, $alchemist_id, $langcode, $var
       $fields[$id]->alterFormField($element);
     }
     else{
-      unset($form[$id]);
+      if(isset($fields[$id])){
+        unset($form[$id]);
+      }
+      else{
+        // Some fields need to be loaded into primary form but hidden. One case
+        // for this is path alias. If a path alias is changed via the settings
+        // pannel, and then saved, and then re-editing, the change will be lost
+        // unless the defaults are saved in this form.
+
+        // Remove all field API fields so default values are saved.
+        if(isset($form[$id][$langcode]['#field_name'])){
+          unset($form[$id]);
+        }
+        else{
+          $form['#alchemist_hidden'][] = $id;
+        }
+        // dsm($form[$id]);
+        // $form[$id]['#after_build_hide'] = TRUE;
+      }
     }
   }
+
   $form['title'] = array(
     '#title' => t('Title'),
     '#type' => 'textfield',
@@ -115,10 +146,11 @@ function alchemist_page_form($form, &$form_state, $alchemist_id, $langcode, $var
     '#default_value' => $node->title,
     '#weight' => -5,
     '#id' => 'edit-title',
+    '#alchemist_available' => TRUE,
     '#prefix' => '<div class="element-hidden">',
     '#suffix' => '</div>',
   );
-  $form['actions'] = array('#type' => 'actions');
+  $form['actions'] = array('#type' => 'actions','#alchemist_available' => TRUE);
 
   $form['actions']['settings']['#markup'] = l('<i class="fa fa-cog"></i> Settings', 'alchemist/settings/' . alchemist_get_id(), array('html'=>TRUE, 'attributes'=>array('class'=>array('alc-edit', 'button', 'use-ajax'))));
 
@@ -148,6 +180,7 @@ function alchemist_page_form($form, &$form_state, $alchemist_id, $langcode, $var
       '#value' => '<i class="fa fa-undo"></i> ' . t('Discard'),
       '#attributes' => array('class'=>array('button','secondary')),
       '#submit' => array('alchemist_page_form_revert_submit'),
+      '#limit_validation_errors' => array(),
     );
   }
   $form['alchemist_id'] = array(
@@ -162,9 +195,21 @@ function alchemist_page_form($form, &$form_state, $alchemist_id, $langcode, $var
     $form['actions']['delete']['#markup'] = l('<i class="fa fa-trash-o"></i> Delete', 'node/'.$node->nid.'/delete', array('html'=>TRUE, 'attributes'=>array('class'=>array('button','alert','tiny','secondary'))));
   }
 
+  $form['#after_build'][] = 'alchemist_page_form_after_build';
 
-  // $form['#submit'][] = 'alchemist_page_form_submit';
   return $form;
+}
+
+function alchemist_page_form_after_build($element){
+  // dsm($element['page_title']);
+  foreach($element['#alchemist_hidden'] as $id){
+    if(empty($element[$id]['#alchemist_available'])){
+      $element[$id]['#prefix'] = '<div class="element-hidden">';
+      $element[$id]['#suffix'] = '</div>';
+      // $element[$id]['#access'] = FALSE;
+    }
+  }
+  return $element;
 }
 
 function alchemist_page_form_validate($form, &$form_state){
@@ -209,7 +254,14 @@ function alchemist_page_form_submit($form, &$form_state){
   $vars = alchemist_get_cache($alchemist_id);
   $node = $vars['node'];
 
-  entity_form_submit_build_entity('node', $node, $form, $form_state);
+  // If settings form has been utilized, we need to merge in the submitted values
+  if(isset($vars['settings'])){
+    $form_state['values'] = $vars['settings'] + $form_state['values'];
+  }
+
+  $node = node_form_submit_build_node($form, $form_state);
+
+  // entity_form_submit_build_entity('node', $node, $form, $form_state);
 
   $insert = empty($node->nid);
 
@@ -275,10 +327,13 @@ function alchemist_settings_edit($alchemist_id, $type = 'ajax'){
 }
 
 function alchemist_settings_edit_form($form, &$form_state, $alchemist_id){
-  $vars = alchemist_get_cache($alchemist_id);
+  $vars = $form_state['alchemist_vars'] = alchemist_get_cache($alchemist_id);
   $node = $vars['node'];
   $fields = $vars['fields'];
   $form_state['alchemist_id'] = $alchemist_id;
+
+  // Prepare node
+  node_object_prepare($node);
 
   form_load_include($form_state, 'inc', 'node', 'node.pages');
   $form += node_form($form, $form_state, $node);
@@ -299,7 +354,7 @@ function alchemist_settings_edit_form($form, &$form_state, $alchemist_id){
   $form['actions'] = array('#type' => 'actions','#weight' => 5000);
   $form['actions']['submit'] = array(
     '#type' => 'alchemist_submit',
-    '#value' => t('Save'),
+    '#value' => t('Update'),
     '#ajax' => $ajax,
     '#submit' => array('alchemist_settings_edit_form_submit'),
     '#attributes' => array('class'=>array('button','expand')),
@@ -307,8 +362,14 @@ function alchemist_settings_edit_form($form, &$form_state, $alchemist_id){
   $form['#validate'][] = 'alchemist_settings_edit_form_validate';
 
   // Run alter hooks as if we were the actual node form.
-  $hooks = array('form', 'form_node_form', 'form_'.$node->type.'_node_form');
+  $form_id = 'form_'.$node->type.'_node_form';
+  $hooks = array('form', 'form_node_form', $form_id);
   drupal_alter($hooks, $form, $form_state, $form_id);
+
+  // Temporary menu enable
+  if(!empty($node->menu['enabled'])){
+    $form['menu']['enabled']['#default_value'] = 1;
+  }
 
   foreach(element_children($form) as $key){
     $element = &$form[$key];
@@ -319,12 +380,17 @@ function alchemist_settings_edit_form($form, &$form_state, $alchemist_id){
       }
     }
   }
+
   return $form;
 }
 
 function alchemist_settings_edit_form_ajax_submit($form, $form_state){
   $commands = array();
   $commands[] = ajax_command_alchemist_panel_close();
+
+  // Allow commands to be altered and added to.
+  drupal_alter('alchemist_settings_update', $commands, $form_state['alchemist_vars']);
+
   return array(
     '#type' => 'ajax',
     '#commands' => $commands,
@@ -335,18 +401,18 @@ function alchemist_settings_edit_form_validate($form, $form_state){
   node_form_validate($form, $form_state);
 }
 
-function alchemist_settings_edit_form_submit($form, $form_state){
+function alchemist_settings_edit_form_submit($form, &$form_state){
   $alchemist_id = $form_state['alchemist_id'];
   $node = node_form_submit_build_node($form, $form_state);
-  $vars = alchemist_get_cache($alchemist_id);
-  $vars['node'] = $node;
-  alchemist_set_cache($alchemist_id, $vars);
+  $form_state['alchemist_vars']['node'] = $node;
+  $form_state['alchemist_vars']['settings'] = $form_state['values'];
+  alchemist_set_cache($alchemist_id, $form_state['alchemist_vars']);
 }
 
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// Child Form
+// Field Form
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -422,8 +488,8 @@ function alchemist_field_edit_form($form, &$form_state, $alchemist_id, $field_na
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#name' => 'submit-' . implode('-', $form['#parents']),
-    '#type' => 'submit',
-    '#value' => t('Save'),
+    '#type' => 'alchemist_submit',
+    '#value' => t('Update'),
     '#ajax' => $ajax,
     '#attributes' => array('class'=>array('button','expand')),
     '#submit' => array('alchemist_field_edit_form_submit'),
@@ -529,9 +595,9 @@ function _alchemist_preprocess_html(&$vars){
             </div>
           </div>
         </div>
-        <div class="alc-pusher">
-          <div class="alc-content">
-            <div class="alc-content-inner">',
+        <div id="alc-pusher">
+          <div id="alc-content">
+            <div id="alc-content-inner">',
   );
   // $vars['page']['page_bottom']['alc-edit'] = array(
   //   '#markup' => '<div id="alc-edit">' . l('<i class="fa fa-cog"></i>', 'alchemist/edit/' . alchemist_get_id(), array('html'=>TRUE, 'attributes'=>array('class'=>array('use-ajax')))) . '</div>'
@@ -551,13 +617,13 @@ function _alchemist_preprocess_html(&$vars){
  * Create editable title.
  */
 function alchemist_build_title($node){
-  $id = 'alchemist-title';
+  $id = 'alc-title';
   drupal_add_js(array('alchemist' => array(
     'textfield' => array(
       $id => array(
       'field' => '#edit-title',
   )))), 'setting');
-  return '<div id="'.$id.'" class="alchemist-editable alchemist-title" data-ph="'.t('Title').'" contenteditable="true">' . $node->title . '</div>';
+  return '<div id="'.$id.'" class="alc-editable alc-title" data-ph="'.t('Title').'" contenteditable="true">' . $node->title . '</div>';
 }
 
 

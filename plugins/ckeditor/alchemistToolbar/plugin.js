@@ -103,15 +103,20 @@
      * Get position and dimensions of an element.
      */
     getElementPosition = function(element){
-      var obj = element.$, xPosition = 0, yPosition = 0;
-      var height = obj.offsetHeight, width = obj.offsetWidth;
+      var position = {left:0,top:0,height:0,width:0};
+      if(!element){
+        return position;
+      }
+      var obj = element.$;
+      position.height = obj.offsetHeight;
+      position.width = obj.offsetWidth;
 
       while(obj) {
-        xPosition += (obj.offsetLeft - obj.scrollLeft + obj.clientLeft);
-        yPosition += (obj.offsetTop - obj.scrollTop + obj.clientTop);
+        position.left += (obj.offsetLeft - obj.scrollLeft + obj.clientLeft);
+        position.top += (obj.offsetTop - obj.scrollTop + obj.clientTop);
         obj = obj.offsetParent;
       }
-      return { left: xPosition, top: yPosition, height: height, width: width};
+      return position;
     }
 
     /**
@@ -180,7 +185,6 @@
         toolpos.x = editorPosition.left;
       }
 
-      console.log(documentPosition);
       // make sure toolbar does not extend out of the right CKEditor border
       // if (selectionPosition.left + (toolbarDimensions.width/2) >= editorPosition.left + editorPosition.width ){
       if (selectionPosition.left + (toolbarDimensions.width/2) >= documentPosition.width ){
@@ -212,18 +216,17 @@
 
     showToolbar = function(){
       var toolbar = getToolbar();
-      // toolbar.show();
-      toolbar.$.className = 'active';
+      toolbar.$.className = 'active in';
     }
 
-    hideToolbar = function(){
+    hideToolbar = function(classes){
       var toolbar = getToolbar();
-      // toolbar.hide();
-      toolbar.$.className = '';
+      classes = classes ? ' ' + classes : '';
+      toolbar.$.className = 'active out' + classes;
     }
 
     if(op == 'hide'){
-      hideToolbar();
+      hideToolbar('hide');
       return;
     }
 
