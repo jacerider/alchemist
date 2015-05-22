@@ -133,7 +133,6 @@ function alchemist_page_form($form, &$form_state, $alchemist_id, $langcode, $var
         else{
           $form['#alchemist_hidden'][] = $id;
         }
-        // dsm($form[$id]);
         // $form[$id]['#after_build_hide'] = TRUE;
       }
     }
@@ -196,12 +195,12 @@ function alchemist_page_form($form, &$form_state, $alchemist_id, $langcode, $var
   }
 
   $form['#after_build'][] = 'alchemist_page_form_after_build';
+  array_unshift($form['#validate'], 'alchemist_page_form_validate');
 
   return $form;
 }
 
 function alchemist_page_form_after_build($element){
-  // dsm($element['page_title']);
   foreach($element['#alchemist_hidden'] as $id){
     if(empty($element[$id]['#alchemist_available'])){
       $element[$id]['#prefix'] = '<div class="element-hidden">';
@@ -214,6 +213,10 @@ function alchemist_page_form_after_build($element){
 
 function alchemist_page_form_validate($form, &$form_state){
   $node = $form_state['node'];
+
+  // Bypass node_validate last changed check.
+  $form_state['values']['changed'] = time();
+
   $tmp_node = clone $node;
   entity_form_submit_build_entity('node', $tmp_node, $form, $form_state);
   // Notify field widgets to validate their data.
@@ -221,7 +224,7 @@ function alchemist_page_form_validate($form, &$form_state){
 }
 
 function alchemist_page_form_unpublish_submit($form, &$form_state){
-  $form_state['node']->status = 0;
+  $form_state['values']['status'] = 0;
   alchemist_page_form_submit($form, $form_state);
 }
 
@@ -238,13 +241,13 @@ function alchemist_page_form_revert_submit($form, &$form_state){
 
 function alchemist_page_form_revision_submit($form, &$form_state){
   if(variable_get('alchemist_revisions_' . $form_state['node']->type, 0)){
-    $form_state['node']->revision = 1;
+    $form_state['values']['revision'] = 1;
   }
   alchemist_page_form_publish_submit($form, $form_state);
 }
 
 function alchemist_page_form_publish_submit($form, &$form_state){
-  $form_state['node']->status = 1;
+  $form_state['values']['status'] = 1;
   alchemist_page_form_submit($form, $form_state);
 }
 
@@ -254,14 +257,14 @@ function alchemist_page_form_submit($form, &$form_state){
   $vars = alchemist_get_cache($alchemist_id);
   $node = $vars['node'];
 
+  $node->changed = time() + 100;
+
   // If settings form has been utilized, we need to merge in the submitted values
   if(isset($vars['settings'])){
     $form_state['values'] = $vars['settings'] + $form_state['values'];
   }
 
   $node = node_form_submit_build_node($form, $form_state);
-
-  // entity_form_submit_build_entity('node', $node, $form, $form_state);
 
   $insert = empty($node->nid);
 
