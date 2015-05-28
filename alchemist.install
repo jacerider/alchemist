@@ -1,6 +1,0 @@
-<?php
-
-function alchemist_uninstall(){
-  // Remove variables
-  db_query("DELETE FROM {variable} WHERE name LIKE 'alchemist_%'");
-}
