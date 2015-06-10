@@ -1,0 +1,46 @@
+<?php
+
+/**
+* Implements hook_schema
+*/
+function alchemist_schema() {
+  // Create new cache table using core cache schema
+  $schema['cache_alchemist'] = drupal_get_schema_unprocessed('system', 'cache');
+  $schema['cache_alchemist']['description'] = 'Cache bin for the Alchemist module';
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function alchemist_install(){
+
+  // Create default image.
+  $filepath = drupal_realpath(drupal_get_path('module', 'alchemist') . '/images/alchemist-placeholder.jpg');
+  $image = file_get_contents($filepath);
+  $directory = 'public://alchemist';
+  file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
+  $file = file_save_data($image, $directory . '/alchemist-placeholder.jpg',FILE_EXISTS_REPLACE);
+  if(!empty($file->fid)){
+    $settings = variable_get('alchemist', array());
+    $settings['default_image'] = $file->fid;
+    variable_set('alchemist', $settings);
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function alchemist_uninstall(){
+
+  // Remove default image.
+  $settings = variable_get('alchemist', array());
+  if(isset($settings['default_image'])){
+    $file = file_load($settings['default_image']);
+    file_delete($file);
+  }
+
+  // Remove variables
+  db_query("DELETE FROM {variable} WHERE name = 'alchemist'");
+  db_query("DELETE FROM {variable} WHERE name LIKE 'alchemist%'");
+}

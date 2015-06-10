@@ -1,0 +1,12 @@
+name = Alchemist
+description = A content creation system that emphasises data fragmentation and inline editing.
+package = Alchemist
+core = 7.x
+version = "7.x-2.0"
+
+dependencies[] = entity
+dependencies[] = views
+dependencies[] = libraries
+
+files[] = plugins/field/alchemistField.inc
+files[] = views/alchemist_plugin_argument_default_node.inc
