@@ -1,54 +1,10 @@
 <?php
 
 /**
- * Implements hook_form_NODE_TYPE_FORM_alter().
- */
-function alchemist_form_node_type_form_alter(&$form, $form_state) {
-  if (isset($form['type'])) {
-    $form['alchemist'] = array(
-      '#type' => 'fieldset',
-      '#title' => t('Alchemist'),
-      '#collapsible' => TRUE,
-      '#collapsed' => TRUE,
-      '#group' => 'additional_settings',
-      '#attributes' => array(
-        'class' => array('alchemist-node-type-settings-form'),
-      ),
-      '#attached' => array(
-        'js' => array(drupal_get_path('module', 'alchemist') . '/js/alchemist.node-type-form.js'),
-      ),
-    );
-    $form['alchemist']['alchemist_status'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Enable'),
-      '#default_value' => variable_get('alchemist_status_' . $form['#node_type']->type, 0),
-      '#description' => t('Enable the Alchemist inline content creation workflow on all content of this type.'),
-      '#attributes' => array(
-        'data-enabled-description' => t('Enabled'),
-        'data-disabled-description' => t('Disabled'),
-      ),
-    );
-
-    // $form['alchemist']['alchemist_settings'] = array(
-    //   '#type' => 'fieldset',
-    // );
-    // $form['alchemist']['alchemist_settings']['#states']['visible'][':input[name="alchemist_status"]'] = array('checked' => TRUE);
-
-    // $settings = variable_get('alchemist_settings_' . $form['#node_type']->type, array());
-    // $form['alchemist']['alchemist_settings']['alchemist_revisions'] = array(
-    //   '#type' => 'checkbox',
-    //   '#title' => t('Revisions'),
-    //   '#default_value' => variable_get('alchemist_revisions_' . $form['#node_type']->type, 0),
-    //   '#description' => t('Allow for revision creation.'),
-    // );
-  }
-}
-
-/**
- * Implements hook_form_FIELD_UI_FIELD_EDIT_FORM_alter().
+ * Implements hook_form_FORM_ID_alter().
  */
 function alchemist_form_field_ui_field_edit_form_alter(&$form, &$form_state) {
-  if(isset($form['#instance']['entity_type']) && $form['#instance']['entity_type'] == 'node'){
+  if($form['#instance']['entity_type'] == 'node'){
     $entity_type = $form['#instance']['entity_type'];
     $bundle = $form['#instance']['bundle'];
     if(array_key_exists($bundle, alchemist_get_node_types())){
@@ -59,33 +15,44 @@ function alchemist_form_field_ui_field_edit_form_alter(&$form, &$form_state) {
 
 /**
  * Alchemist configuration form.
+ *
+ * @param $form
+ *   An associative array containing the structure of the form.
+ * @param $form_state
+ *   A keyed array containing the current state of the form.
  */
 function alchemist_form_field_form(&$form, &$form_state){
   $field = empty($form['#field']) ? array() : $form['#field'];
   $instance = empty($form['#instance']) ? array() : $form['#instance'];
+  $node = alchemist_get_placeholder($instance['bundle']);
+  $form_state['entity'] = $node;
+  $langcode = entity_language('node', $node);
+  $plugin = alchemist_get_fieldable_plugin($node, $field, $instance, $langcode);
+  $plugin->setPlaceholder();
 
   // Get defaults
-  $defaults = !empty($instance['settings']['alchemist']['settings']) ? $instance['settings']['alchemist']['settings'] : array();
+  $defaults = !empty($instance['settings']['alchemist']) ? $instance['settings']['alchemist'] : array();
+  $defaults += array('status' => 0, 'default' => 1, 'settings' => array(), 'placeholder' => array());
 
   // Fieldset for alchemist settings on this field instance.
-  $form['instance']['settings']['alchemist'] = array(
+  $alchemist = array(
     '#type' => 'fieldset',
     '#title' => t('Alchemist'),
     '#collapsible' => FALSE,
     '#collapsed' => FALSE,
     '#id' => 'edit-instance-settings-alchemist',
+    '#element_validate' => array('alchemist_form_field_form_validate'),
   );
 
   // Enable alchemist on this field instance.
-  $form['instance']['settings']['alchemist']['status'] = array(
+  $alchemist['status'] = array(
     '#type' => 'checkbox',
     '#title' => t('Enable Alchemist'),
     '#description' => t('Expose this field to the Alchemist editing interface.'),
     '#default_value' => isset($instance['settings']['alchemist']['status']) ? $instance['settings']['alchemist']['status'] : 0,
-    '#element_validate' => array('alchemist_form_field_form_default_validate'),
   );
 
-  $form['instance']['settings']['alchemist']['default'] = array(
+  $alchemist['default'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use Default Alchemist Settings'),
     '#description' => t('Defaults are set via !url.', array('!url' => l('admin/structure/alchemists/settings','admin/structure/alchemists/settings'))),
@@ -97,73 +64,108 @@ function alchemist_form_field_form(&$form, &$form_state){
     ),
   );
 
-  $form['instance']['settings']['alchemist']['settings'] = alchemist_configuration_form($defaults);
-
-  $form['instance']['settings']['alchemist']['settings']['#states'] = array(
+  form_load_include($form_state, 'inc', 'alchemist', 'includes/alchemist.admin');
+  $default_settings = !empty($defaults['settings']) ? $defaults['settings'] : variable_get('alchemist');
+  $alchemist['settings'] = alchemist_configuration_form($default_settings, array($field['type']));
+  $alchemist['settings']['#states'] = array(
       'visible' => array(
         'input[name="instance[settings][alchemist][status]"]' => array('checked' => TRUE),
         'input[name="instance[settings][alchemist][default]"]' => array('checked' => FALSE),
       ),
   );
 
-  $node = alchemist_create_entity($instance['bundle']);
-  $handler = alchemist_get_field_handler($field['type'], $node, $field, $instance);
-  $instance_defaults = !empty($instance['settings']['alchemist']['instance']) ? $instance['settings']['alchemist']['instance'] : array();
-  $instance_form = $handler->settingsForm($instance_defaults);
-  if(!empty($instance_form)){
-    $form['instance']['settings']['alchemist']['instance'] = array(
-      '#type' => 'fieldset',
-      '#title' => t('Instance Settings'),
-      '#collapsible' => FALSE,
-      '#collapsed' => FALSE,
-      '#states' => array(
-        'visible' => array(
-          'input[name="instance[settings][alchemist][status]"]' => array('checked' => TRUE),
-        ),
+  // Placeholder widget.
+  $alchemist['placeholder'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Placeholder value'),
+    '#collapsible' => FALSE,
+    '#tree' => TRUE,
+    '#field' => $field,
+    '#parents' => array('placeholder'),
+    '#field_parents' => array('placeholder'),
+    '#description' => t('The placeholder value for this field is used when creating new content via Alchemist. Unlike the default value, this value is not saved to a node and is only used when content has not yet been entered for a field.'),
+    '#element_validate' => array('alchemist_form_field_form_placeholder_validate'),
+    '#states' => array(
+      'visible' => array(
+        'input[name="instance[settings][alchemist][status]"]' => array('checked' => TRUE),
       ),
-    ) + $instance_form;
-  }
+    ),
+  );
+  $items = field_get_items('node', $node, $field['field_name']) ?: array();
+  $instance['required'] = FALSE;
+  $instance['description'] = '';
+  $alchemist['placeholder'] += field_default_form($instance['entity_type'], $node, $field, $instance, LANGUAGE_NONE, $items, $alchemist['placeholder'], $form_state, 0);
 
-  // $default_value = NULL;
-  // if(isset($form['instance']['default_value_widget'][$instance['field_name']])){
-  //   $default_value = $form['instance']['default_value_widget'][$instance['field_name']];
-  // }
-  // else if(isset($form['instance']['settings']['default_image'])){
-  //   $default_value = $form['instance']['settings']['default_image'];
-  // }
-  // if($default_value){
-  //   $default_value['#access'] = FALSE;
-  //   $form['instance']['settings']['alchemist']['structure'] = $default_value;
-  // }
+  $form['instance']['settings']['alchemist'] = $alchemist;
+
+  array_unshift($form['#submit'], 'alchemist_form_field_form_submit');
 }
 
 /**
  * Validation callback that will clean values before being saved as variables.
+ *
+ * @param $form
+ *   An associative array containing the structure of the form.
+ * @param $form_state
+ *   A keyed array containing the current state of the form.
  */
-function alchemist_form_field_form_default_validate($form, &$form_state){
-  $values = &$form_state['values']['instance']['settings'];
-  if(empty($values['alchemist']['status'])){
-    unset($values['alchemist']);
+function alchemist_form_field_form_validate($form, &$form_state){
+  $values = &$form_state['values']['instance']['settings']['alchemist'];
+  if(empty($values['status'])){
+    unset($form_state['values']['instance']['settings']['alchemist']);
   }
-  if(!empty($values['alchemist']['default'])){
-    unset($values['alchemist']['settings']);
+  else{
+    // $handler = $form_state['alchemist_handler'];
+    // $handler->settingsValidate($form, $form_state, $values['alchemist']);
+  }
+  if(!empty($values['default'])){
+    unset($values['settings']);
   }
 }
 
 /**
- * Settings form for Asset.
+ * Validation callback that will clean values before being saved as variables.
+ *
+ * @param $form
+ *   An associative array containing the structure of the form.
+ * @param $form_state
+ *   A keyed array containing the current state of the form.
  */
-function alchemist_configuration_form($defaults = array()){
+function alchemist_form_field_form_placeholder_validate($form, &$form_state){
+  $values = &$form_state['values']['instance']['settings']['alchemist'];
+  if(!empty($values['status'])){
+    $node = $form_state['entity'];
+    $langcode = entity_language('node', $node);
+    $field = $form['#field'];
 
-  $form = array(
-    '#type' => 'fieldset',
-    '#title' => t('Settings'),
-    '#collapsible' => FALSE,
-    '#collapsed' => FALSE,
-  );
+    field_attach_form_validate('node', $node, $form, $form_state, array('field_name' => $field['field_name']));
+    entity_form_submit_build_entity('node', $node, $form, $form_state);
 
-  $form['info']['#markup'] = '<div class="description">' . t('Temporary placeholder for future settings.') . '</div>';
+    $function = $field['module'] . '_field_is_empty';
+    if (function_exists($function)) {
+      $value = field_get_items('node', $node, $field['field_name']);
+      if(!isset($value[0]) || $function($value[0], $field)){
+        // form_set_error(implode('][', $form[$field['field_name']]['#parents']), t('When Alchemist is enabled, you must supply a placeholder value for it.'));
+      }
+    }
+  }
+}
 
-  drupal_alter('alchemist_configuration_form', $form, $default_values);
-  return $form;
+/**
+ * Submit callback that will update the placeholder node as needed.
+ *
+ * @param $form
+ *   An associative array containing the structure of the form.
+ * @param $form_state
+ *   A keyed array containing the current state of the form.
+ */
+function alchemist_form_field_form_submit($form, &$form_state){
+  $values = &$form_state['values']['instance']['settings']['alchemist'];
+  if(!empty($values['status'])){
+    $field = empty($form['#field']) ? array() : $form['#field'];
+    $instance = empty($form['#instance']) ? array() : $form['#instance'];
+    $node = $form_state['entity'];
+    $langcode = entity_language('node', $node);
+    node_save($node);
+  }
 }

@@ -14,7 +14,6 @@ function alchemist_schema() {
  * Implements hook_install().
  */
 function alchemist_install(){
-
   // Create default image.
   $filepath = drupal_realpath(drupal_get_path('module', 'alchemist') . '/images/alchemist-placeholder.jpg');
   $image = file_get_contents($filepath);
@@ -25,6 +24,7 @@ function alchemist_install(){
     $settings = variable_get('alchemist', array());
     $settings['default_image'] = $file->fid;
     variable_set('alchemist', $settings);
+    file_usage_add($file, 'alchemist', 'alchemsit', 1);
   }
 }
 
@@ -35,9 +35,8 @@ function alchemist_uninstall(){
 
   // Remove default image.
   $settings = variable_get('alchemist', array());
-  if(isset($settings['default_image'])){
-    $file = file_load($settings['default_image']);
-    file_delete($file);
+  if(isset($settings['default_image']) && $file = file_load($settings['default_image'])){
+    file_delete($file, TRUE);
   }
 
   // Remove variables

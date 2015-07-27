@@ -8,5 +8,7 @@ dependencies[] = entity
 dependencies[] = views
 dependencies[] = libraries
 
-files[] = plugins/field/alchemistField.inc
+; files[] = plugins/field/alchemistField.inc
+; files[] = plugins/fieldable/alchemistFieldable.inc
+files[] = views/alchemist_handler_field_node_title.inc
 files[] = views/alchemist_plugin_argument_default_node.inc

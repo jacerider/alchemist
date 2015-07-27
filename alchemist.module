@@ -2,63 +2,23 @@
 
 /**
  * @file
- * Primarily Drupal hooks and global API functions to manipulate alchemist.
+ * Primarily Drupal hooks and global API functions to manipulate Alchemist.
  *
  * This is the main module file for Alchemist.
  */
 
+require_once dirname(__FILE__) . '/includes/alchemist.nodeTypeAdmin.inc';
 require_once dirname(__FILE__) . '/includes/alchemist.fieldAdmin.inc';
-require_once dirname(__FILE__) . '/includes/alchemist.fieldWidget.inc';
+require_once dirname(__FILE__) . '/includes/alchemist.fieldFormatter.inc';
 
 /**
- * Implements hook_field_display_alter();
+ * Implements hook_admin_paths().
  */
-function alchemist_field_display_alter(&$display, $context){
-  if($context['entity_type'] == 'node' && isset($context['entity']->nid) && $node = alchemist_get_node()){
-    // All node display fields that are alchemist enabled and match the node
-    // being operated should use the alchemist display format.
-    if($node->nid == $context['entity']->nid){
-      $settings = array(
-        'fallback_format' => $display['type'],
-        'fallback_settings' => $display['settings'],
-      );
-      if(isset($node->alchemist_node_fields[$context['field']['field_name']])){
-        $settings['alchemist_field'] = $node->alchemist_node_fields[$context['field']['field_name']];
-      }
-      $display['type'] = 'alchemist';
-      $display['settings'] = $settings;
-      $display['module'] = 'alchemist';
-    }
-  }
-}
-
-/**
- * Implements hook_page_alter().
- */
-function alchemist_page_alter(&$page){
-  if(!empty($page['content']['system_main']['#alchemist_cache']) && $node = alchemist_get_node()){
-    // We want to cache the entire node object at the last possible moment.
-    alchemist_set_cache($node);
-  }
-}
-
-/**
- * Implements hook_preprocess_node().
- */
-function alchemist_preprocess_node(&$vars) {
-  if(isset($vars['alchemist_id'])){
-    $vars['page'] = TRUE;
-  }
-}
-
-/**
- * Implements hook_preprocess_node().
- */
-function alchemist_preprocess_page(&$vars) {
-  if(alchemist_valid_path()){
-    $vars['node'] = alchemist_get_node();
-    $vars['title'] = alchemist_preprocess_page_title($vars);
-  }
+function alchemist_admin_paths() {
+  $paths = array(
+    'node/add/alchemist/*' => FALSE,
+  );
+  return $paths;
 }
 
 /**
@@ -67,23 +27,12 @@ function alchemist_preprocess_page(&$vars) {
 function alchemist_menu() {
   $items = array();
   foreach(alchemist_get_node_types() as $type){
-    // Redirect for new node creation.
-    $items['node/add/alchemist/' . $type->type] = array(
-      'title' => $type->name,
-      'page callback' => 'alchemist_page_add_redirect',
-      'page arguments' => array(3),
-      'access callback' => 'node_access',
-      'access arguments' => array('create', $type->type),
-      'type' => MENU_CALLBACK,
-      'file' => 'alchemist.page.inc',
-      'file path' => drupal_get_path('module', 'alchemist') . '/includes'
-    );
     // Node creation page with alchemist_id provided.
     $items['node/add/alchemist/' . $type->type . '/%alchemist'] = array(
       'title' => $type->name,
       'page callback' => 'alchemist_page_edit',
       'page arguments' => array(4),
-      'load arguments' => array(3),
+      'load arguments' => array($type->type),
       'access callback' => 'node_access',
       'access arguments' => array('create', $type->type),
       'type' => MENU_CALLBACK,
@@ -115,14 +64,21 @@ function alchemist_menu() {
     'file' => 'alchemist.fieldEdit.inc',
     'file path' => drupal_get_path('module', 'alchemist') . '/includes'
   );
-  return $items;
-}
 
-function alchemist_admin_paths() {
-  $paths = array(
-    'node/add/alchemist/*' => FALSE,
+  $items['admin/config/content/alchemist'] = array(
+    'title' => 'Alchemist',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('alchemist_settings'),
+    'access arguments' => array('administer alchemist'),
+    'file' => 'includes/alchemist.admin.inc',
+    'description' => t('Configure Alchemist.')
   );
-  return $paths;
+  $items['admin/config/content/alchemist/settings'] = array(
+    'title' => 'Settings',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10
+  );
+  return $items;
 }
 
 /**
@@ -136,6 +92,103 @@ function alchemist_menu_alter(&$items) {
     unset($items[ 'node/add/' . $type->type ]['file']);
   }
 }
+
+/**
+ * Implements hook_preprocess_node().
+ */
+function alchemist_preprocess_node(&$vars) {
+  if(isset($vars['alchemist_id'])){
+    $vars['page'] = TRUE;
+  }
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function alchemist_node_insert($node) {
+  alchemist_delete_cache($node);
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function alchemist_node_update($node) {
+  alchemist_node_insert($node);
+}
+
+/**
+ * Implements hook_preprocess_node().
+ */
+function alchemist_preprocess_page(&$vars) {
+  if(alchemist_valid_path()){
+    $vars['node'] = alchemist_get_node();
+    $vars['title'] = alchemist_preprocess_page_title($vars);
+    // Special consideration for a node that is set as the frontpage.
+    if(variable_get('site_frontpage') == 'node/' . arg(1)){
+      $vars['is_front'] = TRUE;
+    }
+  }
+  if(!empty($vars['page']['content']['system_main']['#alchemist_cache']) && $node = alchemist_get_node()){
+    // We want to cache the entire node object at the last possible moment.
+    alchemist_set_cache($node);
+  }
+}
+
+/**
+ * Implements hook_preprocess_html().
+ */
+function alchemist_preprocess_html(&$vars) {
+  if(alchemist_valid_path()){
+    // Special consideration for a node that is set as the frontpage.
+    if(variable_get('site_frontpage') == 'node/' . arg(1)){
+      $vars['is_front'] = TRUE;
+      foreach($vars['classes_array'] as &$class){
+        if($class == 'not-front'){
+          $class = 'front';
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_field_display_alter();
+ */
+function alchemist_field_display_alter(&$display, $context){
+  if($context['entity_type'] == 'node' && $node = alchemist_get_node()){
+    // All node display fields that are alchemist enabled and match the node
+    // being operated should use the alchemist display format.
+    if($node->nid == $context['entity']->nid){
+      $settings = array(
+        'fallback_format' => $display['type'],
+        'fallback_settings' => $display['settings'],
+      );
+      $display['type'] = 'alchemist';
+      $display['settings'] = $settings;
+      $display['module'] = 'alchemist';
+    }
+  }
+}
+
+/**
+ * Redirect from node/add/NODE_TYPE to alchemist edit page.
+ */
+function alchemist_redirect_create( $bundle ){
+  $alchemist_id = alchemist_get_id( NULL, $bundle );
+  drupal_goto('node/add/alchemist/' . $bundle . '/' . $alchemist_id);
+}
+
+/**
+ * Implements hook_fett_icons_alter().
+ */
+function alchemist_fett_icons_alter(&$icons){
+  $icons['Alchemist'] = 'flask';
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Access and permissions
+////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Determines whether the current user may perform the alchemist operation on
@@ -160,18 +213,79 @@ function alchemist_menu_alter(&$items) {
 function alchemist_node_access_check($op, $node, $account = NULL) {
   $types = alchemist_get_node_types();
   if(isset($types[$node->type])){
+    return TRUE;
     return node_access($op, $node, $account);
   }
   return FALSE;
 }
 
 /**
- * Implements hook_fett_icons_alter().
+ * Helper for node access functions. Will hide all Alchemist scaffolding nodes.
+ *
+ * @param $query
+ *   The query to add conditions to.
+ * @param $type
+ *   Either 'node' or 'entity' depending on what sort of query it is. See
+ *   node_query_node_access_alter() and node_query_entity_field_access_alter()
+ *   for more.
  */
-function alchemist_fett_icons_alter(&$icons){
-  $icons['Alchemist'] = 'flask';
+function alchemist_query_node_access_alter(QueryAlterableInterface $query){
+  if(!alchemist_valid_path()){
+    $scaffold_nids = variable_get('alchemist_nids', array());
+    if(!empty($scaffold_nids)){
+      // $query->condition('nid', $scaffold_nids, 'NOT IN');
+    }
+  }
 }
 
+/**
+ * Implements hook_permission().
+ */
+function alchemist_permission() {
+  $permissions = array(
+    'administer alchemist' => array(
+      'title' => t('Administer Alchemist'),
+      'description' => t('Configure all global Alchemist settings.'),
+    ),
+  );
+  return $permissions;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Views
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Implements hook_views_api().
+ */
+function alchemist_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'alchemist') . '/views',
+  );
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Scripts
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Create an editable field when in alchemist mode.
+ */
+function alchemist_js_editable($field_name, $field_id, $settings = array()){
+  $settings = array_filter($settings);
+  $settings += array('label' => '');
+  drupal_add_js(array('alchemist' => array(
+    'fields' => array(
+      $field_name => array($field_id => $settings)
+  ))), 'setting');
+}
+
+/**
+ * Implements hook_library().
+ */
 function alchemist_library() {
   $libraries['alchemist'] = array(
     'title' => 'Alchemist',
@@ -205,87 +319,6 @@ function alchemist_library() {
   return $libraries;
 }
 
-// /**
-//  * Implements hook_theme().
-//  */
-// function alchemist_theme() {
-//   return array(
-//     'alchemist_field' => array(
-//       'render element' => 'element',
-//       'file' => 'alchemist.theme.inc',
-//       'path' => drupal_get_path('module', 'alchemist') . '/theme'
-//     ),
-//   );
-// }
-
-////////////////////////////////////////////////////////////////////////////////
-// Ctools
-////////////////////////////////////////////////////////////////////////////////
-
-/**
-* Implements hook_ctools_plugin_directory().
-*/
-function alchemist_ctools_plugin_directory($module, $plugin) {
-  if ($module == 'alchemist') {
-    return 'plugins/' . $plugin;
-  }
-}
-
-/**
- * Implements hook_ctools_plugin_type().
- *
- * Has plenty options. See ctools/help/plugins-creating.html
- */
-function alchemist_ctools_plugin_type() {
-  $plugins = array(
-    'field' => array(
-      'classes' => array('class'),
-    ),
-  );
-  drupal_alter('alchemist_plugin_fields', $plugins);
-  return $plugins;
-}
-
-/**
- * Fetch metadata for one alchemist plugin by the given name.
- */
-function alchemist_get_plugin($plugin_name) {
-  ctools_include('plugins');
-  $plugin = ctools_get_plugins('alchemist', $plugin_name);
-  // If you alter the plugin handler, be sure the new handler is registerd or
-  // you include it in some other way.
-  drupal_alter('alchemist_plugin', $plugin);
-  return $plugin;
-}
-
-/**
- * Get alchemist ctools handlers.
- *
- * @param $handler
- * The links handler name.
- */
-function alchemist_get_handler($type, $name, $id = NULL) {
-  $object_cache = drupal_static(__FUNCTION__);
-  if (!isset($object_cache[$name . $id])) {
-    ctools_include('plugins');
-    $class = ctools_plugin_load_class('alchemist', $type, $name, 'class');
-    $class = class_exists($class) ? $class : 'alchemist'.ucfirst($type);
-    $all_args = func_get_args();
-    $args = array_slice($all_args, 3);
-    $object_cache[$name . $id] = new $class($name, $args);
-  }
-  return $object_cache[$name . $id];
-}
-
-/**
- * Get alchemist ctools handler for a field.
- */
-function alchemist_get_field_handler($field_type, $node, $field, $instance){
-  $type = 'field';
-  $name = 'alchemistField_' . $field_type;
-  return alchemist_get_handler('field', $name, $field['field_name'], $node, $field, $instance);
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Utilities
@@ -295,57 +328,11 @@ function alchemist_get_field_handler($field_type, $node, $field, $instance){
  * Check if path is a valid alchemist managed path.
  */
 function alchemist_valid_path(){
-  $valid = &drupal_static(__FUNCTION__);
-  if(!isset($valid)){
-    $valid = arg(0) == 'node' && arg(2) == 'alchemist';
-  }
-  return $valid;
+  return arg(0) == 'node' && arg(2) == 'alchemist';
 }
 
 /**
- * Redirect from node/add/NODE_TYPE to alchemist edit page
- */
-function alchemist_redirect_create( $type ){
-  drupal_goto('node/add/alchemist/' . $type);
-}
-
-/**
- * Create a new node object.
- */
-function alchemist_create_entity($bundle, $entity_type = 'node', $alchemist_id = NULL) {
-  global $user;
-  $values = array(
-    'type'     => $bundle,
-    'nid'      => NULL,
-    'uid'      => $user->uid,
-    'name'     => $user->name,
-    'title'    => '',
-    'created'  => time(),
-    'changed'  => time(),
-  );
-  $entity = entity_create($entity_type, $values);
-  $entity->alchemist_id = $alchemist_id ? $alchemist_id : alchemist_get_id($entity);
-  return $entity;
-}
-
-/**
- * Get id for page.
- */
-function alchemist_get_id($node = NULL){
-  $id = &drupal_static(__FUNCTION__);
-  if(!isset($id)){
-    if(empty($node->nid)){
-      $id = drupal_random_key();
-    }
-    else{
-      $id = $node->nid;
-    }
-  }
-  return $id;
-}
-
-/**
- * Get current alchemist node.
+ * Get current Alchemist node.
  */
 function alchemist_get_node(){
   $node = &drupal_static(__FUNCTION__);
@@ -362,6 +349,91 @@ function alchemist_get_node(){
 }
 
 /**
+ * Implements hook_load().
+ */
+function alchemist_load($alchemist_id, $bundle = NULL){
+  $nodes = &drupal_static(__FUNCTION__);
+  if(!isset($nodes[$alchemist_id]) && $alchemist_id !== 'add'){
+    // Check if we have this node cached via alchemist id.
+    $node = alchemist_get_cache_by_id($alchemist_id);
+    // If we don't, lets fetch the existing node or placeholder.
+    if(empty($node)){
+      if($bundle && is_string($bundle)){
+        // Node loaded.
+        $node = new stdClass();
+        $node->type = $bundle;
+      }
+      elseif(is_numeric($alchemist_id)){
+        $node = node_load($alchemist_id);
+      }
+    }
+    if(!empty($node)){
+      $node->alchemist_id = $alchemist_id;
+      foreach(alchemist_get_placeholder($node->type) as $key => $value){
+        if(empty($node->{$key})){
+          $node->{$key} = $value;
+        }
+      }
+      $nodes[$alchemist_id] = $node;
+    }
+  }
+  return isset($nodes[$alchemist_id]) ? $nodes[$alchemist_id] : FALSE;
+}
+
+/**
+ * Get id for page.
+ *
+ * @param $node
+ *   The node object
+ * @param $bundle
+ *   The node type
+ */
+function alchemist_get_id($node = NULL, $bundle = NULL){
+  if($bundle && is_string($bundle)){
+    $node = alchemist_get_placeholder($bundle);
+    $id = $node->nid . drupal_random_key();
+  }
+  else{
+    $id = isset($node->alchemist_id) ? $node->alchemist_id : $node->nid;
+  }
+  return $id;
+}
+
+/**
+ * Get the placeholder node for a Alchemist-enabled content type.
+ */
+function alchemist_get_placeholder($bundle){
+  $settings = variable_get('alchemist_' . $bundle, array());
+  if(!empty($settings['nid']) && $node = node_load($settings['nid'])){
+    $node->alchemist_id = '';
+    return $node;
+  }
+  return NULL;
+}
+
+/**
+ * A helper function to allow quick access to Alchemist node type settings.
+ *
+ * @param $name
+ *   The name of the variable to return.
+ * @param $default
+ *   The default value to use if this variable has never been set.
+ * @param $bundle
+ *   The node bundle name.
+ *
+ * @return
+ *   The value of the variable. Unserialization is taken care of as necessary.
+ */
+function alchemist_variable_get($name, $default = NULL, $bundle = NULL){
+  $id = 'alchemist';
+  if($bundle){
+    $id .= '_' . $bundle;
+  }
+  $variable = variable_get($id);
+  return isset($variable[$name]) ? $variable[$name] : $default;
+}
+
+/**
  * Get a list of node types that are alchemist enabled.
  *
  * @return array
@@ -372,7 +444,7 @@ function alchemist_get_node_types(){
   if (!isset($types)) {
     $types = array();
     foreach(node_type_get_types() as $type_id => $type){
-      if(variable_get('alchemist_status_' . $type->type, 0)){
+      if(alchemist_variable_get('status', 0, $type->type)){
         $types[$type_id] = $type;
       }
     }
@@ -380,93 +452,25 @@ function alchemist_get_node_types(){
   return $types;
 }
 
-/**
- * Create an editable field when in alchemist mode.
- */
-function alchemist_js_editable($field_name, $field_id, $settings = array()){
-  $settings = array_filter($settings);
-  $settings += array('label' => '');
-  drupal_add_js(array('alchemist' => array(
-    'fields' => array(
-      $field_name => array($field_id => $settings)
-  ))), 'setting');
-}
+
+////////////////////////////////////////////////////////////////////////////////
+// Fields and Handlers
+////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Implements hook_load().
- */
-function alchemist_load($alchemist_id, $bundle = NULL){
-  $node = alchemist_get_cache_by_id($alchemist_id);
-  if(empty($node)){
-    if($bundle){
-      $node = alchemist_create_entity($bundle, 'node', $alchemist_id);
-      $node->alchemist_id = $alchemist_id;
-    }
-    // If we don't have a cached node and we are passing in a node id we should
-    // load it.
-    else if(empty($node) && is_numeric($alchemist_id)){
-      $node = node_load($alchemist_id);
-      $node->alchemist_id = $alchemist_id;
-    }
-  }
-  return empty($node) ? FALSE : $node;
-}
-
-/**
- * Get a field handler by id.
- */
-function alchemist_get_handler_by_id($node, $field_id){
-  if(isset($node->alchemist_fields)){
-    foreach($node->alchemist_fields as $fields){
-      foreach($fields as $id => $handler){
-        if($id == $field_id){
-          return $handler;
-        }
-      }
-    }
-  }
-  return FALSE;
-}
-
-/**
- * Get available fields and their handlers for a given node.
+ * Get fields that are Alchemist enabled.
  *
- * @param $limit_fields
- *   An array of fieldnames that can be provided to limit returned results.
- */
-function alchemist_build_fields($node){
-  $fields = array();
-  foreach(alchemist_get_fields($node->type) as $field_name => $field){
-    $fields[$field_name] = alchemist_build_field($field_name, $node);
-  }
-  $node->alchemist_node_fields = $fields;
-  return $fields;
-}
-
-/**
- * Get a specific field and its handler.
- */
-function alchemist_build_field($field_name, $node){
-  $fields = alchemist_get_fields($node->type);
-  if(isset($fields[$field_name])){
-    $field = $fields[$field_name];
-    $handler = alchemist_get_field_handler($field['field']['type'], $node, $field['field'], $field['instance']);
-    // Store in node.
-    $node->alchemist_fields[$field_name][$handler->getId()] = $handler;
-    return $handler;
-  }
-  return NULL;
-}
-
-/**
- * Get fields that are alchemist enabled.
+ * @param $entity_type
+ *   The entity type.
+ * @param $bundle
+ *   The entity bundle name.
  *
  * @return array
  *   An array of enabled fields for a given node bundle keyed by field name and
  *   containing both field and instance data.
  *
  */
-function alchemist_get_fields($bundle, $entity_type = 'node'){
+function alchemist_get_fields($entity_type, $bundle){
   $fields = &drupal_static(__FUNCTION__);
   if (!isset($fields)) {
     $fields = array();
@@ -484,31 +488,106 @@ function alchemist_get_fields($bundle, $entity_type = 'node'){
   return $fields;
 }
 
+/**
+ * Check to see if a field is Alchemist enabled.
+ *
+ * @param $entity_type
+ *   The entity type.
+ * @param $bundle
+ *   The entity bundle name.
+ *
+ * @return array
+ *   An array containing both field and instance data as keys.
+ */
+function alchemist_field_enabled($entity_type, $bundle, $field_name){
+  if($fields = alchemist_get_fields($entity_type, $bundle)){
+    return isset($fields[$field_name]) ? $fields[$field_name] : array();
+  }
+}
+
+/**
+ * Get a fieldable field plugin.
+ *
+ * @param $node
+ *   The node for the operation.
+ * @param $field
+ *   The field structure for the operation.
+ * @param $instance
+ *   The instance structure for $field on $node's bundle.
+ * @param $langcode
+ *   The language associated with $display.
+ * @param $display
+ *   The display settings to use, as found in the 'display' entry of instance
+ *   definitions. The array notably contains the following keys and values;
+ *   - type: The name of the formatter to use.
+ *   - settings: The array of formatter settings.
+ *
+ * @return
+ *   The Alchemist field plugin.
+ */
+function alchemist_get_fieldable_plugin($node, $field, $instance, $langcode, $display = 'full') {
+  $keys = array('alchemistFieldable_' . $field['type'], 'alchemistFieldable');
+  foreach($keys as $key){
+    if($plugin = alchemist_get_plugin('fields', $key, $node, $field, $instance, $langcode, $display)){
+      $node->alchemist_fields[$field['field_name']][$plugin->id] = $plugin;
+      return $plugin;
+    }
+  }
+  return FALSE;
+}
+
+
+/**
+ * Get a simple field plugin.
+ *
+ * @param $node
+ *   The node for the operation.
+ * @param $field_key
+ *   The unique field key used in the form API.
+ * @param $label
+ *   The name or title of the simple field.
+ *
+ * @return
+ *   The Alchemist field plugin.
+ */
+function alchemist_get_field_plugin($node, $field_key, $label) {
+  $field = array('type' => $field_key, 'field_name' => $field_key);
+  $instance = array('label' => $label);
+  $keys = array('alchemistField_' . $field['type'], 'alchemistField');
+  foreach($keys as $key){
+    if($plugin = alchemist_get_plugin('fields', $key, $node, $field, $instance)){
+      $node->alchemist_fields[$field['field_name']][$plugin->id] = $plugin;
+      return $plugin;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Get a field handler by id.
+ *
+ * @param $node
+ *   The node for the operation.
+ * @param $field_id
+ *   The unique field id used by this field.
+ */
+function alchemist_get_field_plugin_by_id($node, $field_id){
+  if(isset($node->alchemist_fields)){
+    foreach($node->alchemist_fields as $fields){
+      foreach($fields as $id => $plugin){
+        if($id == $field_id){
+          return $plugin;
+        }
+      }
+    }
+  }
+  return FALSE;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Ajax Callbacks
 ////////////////////////////////////////////////////////////////////////////////
-
-/**
- * Insert HTML into alchemist pane.
- *
- * @param $html
- *   Html to insert into editor.
- * @param $settings
- *   An optional array of settings that will be used for this command only.
- *
- * @return
- *   An array suitable for use with the ajax_render() function.
- */
-// function ajax_command_alchemist_edit($html, $settings = NULL) {
-//   $messages = theme('status_messages');
-//   $html = $messages . $html;
-//   return array(
-//     'command' => 'alchemistEdit',
-//     'data' => $html,
-//     'settings' => $settings,
-//   );
-// }
 
 /**
  * Flag alchemist as being edited.
@@ -538,18 +617,50 @@ function ajax_command_alchemist_editing_stop() {
   );
 }
 
+
 ////////////////////////////////////////////////////////////////////////////////
-// Views
+// Ctools
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Implements hook_views_api().
+ * Implements hook_ctools_plugin_type().
+ *
+ * Has plenty options. See ctools/help/plugins-creating.html
  */
-function alchemist_views_api() {
+function alchemist_ctools_plugin_type() {
   return array(
-    'api' => 3,
-    'path' => drupal_get_path('module', 'alchemist') . '/views',
+    'fields' => array(
+      'use hooks' => TRUE,
+      'classes' => array('handler'),
+    ),
   );
+}
+
+/**
+ * Implementation of hook_alchemist_fields().
+ *
+ * This is a ctools plugins hook.
+ */
+function alchemist_alchemist_fields(){
+  module_load_include('inc', 'alchemist', 'alchemist.plugins');
+  return _alchemist_alchemist_fields();
+}
+
+/**
+ * Fetch metadata for one alchemist plugin by the given name.
+ */
+function alchemist_get_plugin($type = 'fields', $key) {
+  ctools_include('plugins');
+  $plugins = ctools_get_plugins('alchemist', 'fields');
+  if (isset($plugins[$key]) && $class = ctools_plugin_get_class($plugins[$key], 'handler')) {
+    // Check that class exists until CTools & registry issues are resolved.
+    if (class_exists($class)) {
+      $all_args = func_get_args();
+      $args = array_slice($all_args, 2);
+      return new $class($key, $args);
+    }
+  }
+  return FALSE;
 }
 
 
@@ -562,7 +673,7 @@ function alchemist_views_api() {
  */
 function alchemist_set_cache($node){
   $expire = 21600;
-  cache_set('alchemist_' . $node->alchemist_id, $node, 'cache_alchemist', REQUEST_TIME + $expire);
+  cache_set(alchemist_get_id($node), $node, 'cache_alchemist', REQUEST_TIME + $expire);
 }
 
 /**
@@ -571,8 +682,9 @@ function alchemist_set_cache($node){
 function alchemist_get_cache($node){
   $cache = &drupal_static(__FUNCTION__);
   if(!isset($cache)){
-    if ($cached = cache_get('alchemist_' . $node->alchemist_id, 'cache_alchemist')) {
+    if ($cached = cache_get(alchemist_get_id($node), 'cache_alchemist')) {
       $cache = $cached->data;
+      $cache->alchemist_draft = 1;
     }
   }
   return $cache;
@@ -591,5 +703,5 @@ function alchemist_get_cache_by_id($alchemist_id){
  * Delete alchemist cache.
  */
 function alchemist_delete_cache($node){
-  cache_clear_all('alchemist_' . $node->alchemist_id, 'cache_alchemist');
+  cache_clear_all(alchemist_get_id($node), 'cache_alchemist', TRUE);
 }

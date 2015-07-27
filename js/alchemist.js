@@ -6,20 +6,23 @@ Drupal.behaviors.alchemist = {
 
   attach: function(context, settings) {
     var self = this;
-    if(settings.alchemist && !settings.alchemist.once){
-      self.init(settings.alchemist);
+    if(settings.alchemist){
+      if(!settings.alchemist.once){
+        self.once(settings.alchemist, context);
+      }
+      self.repeat(settings.alchemist, context);
     }
   },
 
-  init: function(alchemist) {
+  once: function(alchemist, context) {
     var self = this, instances, fieldName, fieldId, options;
     alchemist.once = 1;
 
-    $('.alc-field').hover(function(e){
-      $('body').addClass('alc-hover');
-    }, function(e){
-      $('body').removeClass('alc-hover');
-    });
+    // $('.alc-field').hover(function(e){
+    //   $('body').addClass('alc-hover');
+    // }, function(e){
+    //   $('body').removeClass('alc-hover');
+    // });
 
     for (fieldName in alchemist.fields) {
       instances = alchemist.fields[fieldName];
@@ -27,15 +30,32 @@ Drupal.behaviors.alchemist = {
         options = instances[fieldId];
         options.fieldId = fieldId;
         options.fieldName = fieldName;
+
         if(Drupal.alchemist.field[options.type]){
           options.handler = new Drupal.alchemist.field[options.type](options);
         }
         else{
           options.handler = new Drupal.alchemist.field.abstract(options);
         }
-        options.handler.render();
+        // options.handler.prepare();
       }
     }
+  },
+
+  repeat: function(alchemist, context) {
+    var self = this, instances, fieldId, options;
+    for (fieldName in alchemist.fields) {
+      instances = alchemist.fields[fieldName];
+      for (fieldId in instances) {
+        options = instances[fieldId];
+        options.handler.prepare();
+      }
+    }
+    // $('.alc-field').once('alc').each(function(){
+    //   var $this = $(this);
+    //   var $child = $this.children();
+    //   $this.addClass($child.attr('class'));
+    // });
   }
 };
 
@@ -45,8 +65,8 @@ Drupal.behaviors.alchemist = {
 Drupal.ajax.prototype.commands.alchemistEditingStart = function (ajax, response, status) {
   if(response.field_id){
     Drupal.alchemist.active = response.field_id;
-    $('#' + response.field_id).addClass('active');
-    $('body').addClass('alc-active');
+    $('*[data-alc-id="' + response.field_id + '"]').addClass('active');
+    $('body').addClass('alc-active').removeClass('alc-hover');
   }
 };
 

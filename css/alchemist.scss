@@ -1,12 +1,9 @@
 @import 'bourbon';
 
-#alchemist{
-
-  // &:hover{
-  //   .alc-field{
-  //     opacity:.5;
-  //   }
-  // }
+.alc-data{
+  display:block;
+  height:20px;
+  background:red;
 }
 
 body{
@@ -78,6 +75,6 @@ body{
   }
 }
 
-.alc-inline{
-  outline: 0;
-}
+// .alc-inline{
+//   outline: 0;
+// }

@@ -13,8 +13,9 @@
 class alchemist_plugin_argument_default_node extends views_plugin_argument_default_node {
   function get_argument() {
     $result = parent::get_argument();
-    if(!$result){
-      $result = arg(0) == 'alchemist' && arg(1) == 'add';
+    if(!$result && arg(0) == 'node' && arg(1) == 'add' && arg(2) == 'alchemist' && arg(3)){
+      $settings = variable_get('alchemist_' . arg(3), array());
+      $result = isset($settings['nid']) ? (int) $settings['nid'] : NULL;
     }
     return $result;
   }

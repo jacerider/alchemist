@@ -1,8 +1,11 @@
 <?php
 
-class alchemistField_image extends alchemistField {
+/**
+ * Image field handler for Alchemist.
+ */
+class alchemistFieldable_image extends alchemistFieldable {
 
-  public function defaultValue(){
+  protected function defaultPlaceholder(){
     $default = array();
     $settings = variable_get('alchemist', array());
     if(isset($settings['default_image']) && $file = file_load($settings['default_image'])){
@@ -10,6 +13,10 @@ class alchemistField_image extends alchemistField {
     }
     return $default;
   }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Getters
+  //////////////////////////////////////////////////////////////////////////////
 
   /**
    * Get the current value of the field.
@@ -26,15 +33,17 @@ class alchemistField_image extends alchemistField {
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  // Edit
+  // Settings
   //////////////////////////////////////////////////////////////////////////////
 
-  public function editForm($form, &$form_state){
-    // Clear out value if it is the default.
-    if($this->getValue() == $this->defaultValue()){
-      $this->setValue(NULL);
-    }
-    return parent::editForm($form, $form_state);
+  public function settingsForm($form, &$form_state, $defaults){
+    $form = parent::settingsForm($form, $form_state, $defaults);
+    $form['blak'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Blak?'),
+      '#default_value' => !empty($defaults['blak']),
+    );
+    return $form;
   }
 
 }
