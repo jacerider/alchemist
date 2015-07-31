@@ -32,39 +32,28 @@ function alchemist_field_formatter_view($entity_type, $entity, $field, $instance
     $entity = $node;
   }
 
-  $element = alchemist_fallback_formatter($entity_type, $entity, $field, $instance, $langcode, $items, $display);
-
-  $wrapper = entity_metadata_wrapper($entity_type, $entity);
-
-  if(!$wrapper->{$field['field_name']}->value()){
-    $element = array(
-      '#theme' => 'field',
-      '#access' => TRUE,
-      '#object' => $entity,
-      '#items' => array(array('#value' => 'hi')),
-      0 => array('#markup' => '<div>Edit '. $instance['label'] .'</div>'),
-    );
-  }
-  else{
-    // dsm($element);
-  }
+  $allow = TRUE;
 
   // Return default output when on any page other than an alchemist page.
   if(!alchemist_valid_path() || $node->nid != $entity->nid || !alchemist_field_enabled($instance['entity_type'], $instance['bundle'], $instance['field_name'])){
-    return $element;
+    $allow = FALSE;
   }
-
 
   // See if access to this form element is restricted,
   // if so, skip widget processing and just set the value.
   if (isset($entity->nid) && ($entity_type != 'node' || !entity_access('update', $entity_type, $entity) || !field_access('edit', $field, $entity_type, $entity))) {
     // Can't edit.
-    return $element;
+    $allow = FALSE;
   }
 
+  if(!$allow){
+    return alchemist_fallback_formatter($entity_type, $entity, $field, $instance, $langcode, $items, $display);
+  }
+
+  $plugin = alchemist_get_fieldable_plugin($node, $field, $instance, $langcode, $display);
+  $element = $plugin->render();
 
   // Register field handler and preprocess field output.
-  $plugin = alchemist_get_fieldable_plugin($node, $field, $instance, $langcode, $display);
   if(isset($display['views_field'])){
     foreach (element_children($element) as $delta) {
       $element[$delta] = $plugin->preprocess($element[$delta]);

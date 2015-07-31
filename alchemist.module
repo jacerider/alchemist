@@ -29,7 +29,7 @@ function alchemist_menu() {
   foreach(alchemist_get_node_types() as $type){
     // Node creation page with alchemist_id provided.
     $items['node/add/alchemist/' . $type->type . '/%alchemist'] = array(
-      'title' => $type->name,
+      'title' => 'Alchemist '.$type->name.' scaffold',
       'page callback' => 'alchemist_page_edit',
       'page arguments' => array(4),
       'load arguments' => array($type->type),
@@ -213,7 +213,6 @@ function alchemist_fett_icons_alter(&$icons){
 function alchemist_node_access_check($op, $node, $account = NULL) {
   $types = alchemist_get_node_types();
   if(isset($types[$node->type])){
-    return TRUE;
     return node_access($op, $node, $account);
   }
   return FALSE;
@@ -233,7 +232,7 @@ function alchemist_query_node_access_alter(QueryAlterableInterface $query){
   if(!alchemist_valid_path()){
     $scaffold_nids = variable_get('alchemist_nids', array());
     if(!empty($scaffold_nids)){
-      // $query->condition('nid', $scaffold_nids, 'NOT IN');
+      $query->condition('nid', $scaffold_nids, 'NOT IN');
     }
   }
 }
@@ -360,8 +359,7 @@ function alchemist_load($alchemist_id, $bundle = NULL){
     if(empty($node)){
       if($bundle && is_string($bundle)){
         // Node loaded.
-        $node = new stdClass();
-        $node->type = $bundle;
+        $node = alchemist_node_scaffold($bundle);
       }
       elseif(is_numeric($alchemist_id)){
         $node = node_load($alchemist_id);
@@ -452,6 +450,56 @@ function alchemist_get_node_types(){
   return $types;
 }
 
+/**
+ * Create a new node that will act as the scaffolding for new Alchemist-created
+ * nodes.
+ *
+ * @param [string] $bundle
+ *   The node bundle name.
+ * @param [object] $user
+ *   An optional user object to make the owner of the node.
+ * @param [string] $title
+ *   An optional title for the node.
+ *
+ * @return [object]
+ *   A node object.
+ */
+function alchemist_node_scaffold($bundle, $user = NULL, $title = ''){
+  if(empty($user->uid)){
+    global $user;
+  }
+  if(empty($title)){
+    $title = alchemist_node_scaffold_title($bundle);
+  }
+  $values = array(
+    'nid' => NULL,
+    'type' => $bundle,
+    'uid' => $user->uid,
+    'status' => 1,
+    'promote' => 0,
+    'created' => time(),
+  );
+  $entity = entity_create('node', $values);
+  $wrapper = entity_metadata_wrapper('node', $entity);
+  $wrapper->title->set($title);
+  // $wrapper->log->set('alchemist');
+  return $entity;
+}
+
+/**
+ * Get the default title of a new Alchemist node.
+ *
+ * @param [string] $bundle
+ *   The node bundle name.
+ *
+ * @return [object]
+ *   A node object.
+ */
+function alchemist_node_scaffold_title($bundle){
+  $node_type = node_type_load($bundle);
+  return t('Edit !title', array('!title' => $node_type->title_label));
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Fields and Handlers
@@ -478,7 +526,7 @@ function alchemist_get_fields($entity_type, $bundle){
       if(!empty($instance['settings']['alchemist']['status'])){
         $fields[$field_name]['field'] = field_info_field($field_name);
         // Load in global defaults if necessary.
-        if(!empty($instance['settings']['alchemist']['default'])){
+        if(empty($instance['settings']['alchemist']['settings'])){
           $instance['settings']['alchemist']['settings'] = variable_get('alchemist', array());
         }
         $fields[$field_name]['instance'] = $instance;

@@ -17,7 +17,6 @@ Drupal.alchemist.field.abstract = function(options){
    */
   this.prepare = function() {
     self.options.$element = $('#' + self.options.fieldId).next();
-    console.log(self.options.$element);
     $(self.options.$element).once('alchemist')
       .addClass('alc-field')
       .attr('data-alc-id', self.options.fieldId)

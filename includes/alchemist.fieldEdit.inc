@@ -65,6 +65,8 @@ function alchemist_field_edit_form_validate($form, &$form_state){
  * Form submit callback: save the field modifications.
  */
 function alchemist_field_edit_form_submit($form, &$form_state) {
+  if (form_get_errors()) return;
+
   $plugin = $form_state['plugin'];
   entity_form_submit_build_entity('node', $plugin->node, $form, $form_state);
   $plugin->editSubmit($form, $form_state);
@@ -77,20 +79,27 @@ function alchemist_field_edit_form_submit($form, &$form_state) {
 function alchemist_field_edit_form_ajax($form, $form_state) {
   $plugin = $form_state['plugin'];
 
-  $commands = array();
-  $commands[] = ajax_command_alchemist_editing_stop();
-
-  $fields = $plugin->node->alchemist_fields[$plugin->fieldName];
-  foreach($fields as $plugin){
-    $output = $plugin->render();
-    if(!empty($output)){
-      // $commands[] = ajax_command_html('#' . $plugin->id, drupal_render($output));
-      $commands[] = ajax_command_replace('*[data-alc-id="' . $plugin->id . '"]', drupal_render($output));
-    }
+  if (form_get_errors()){
+    $commands[] = ajax_command_replace('*[data-alc-id="' . $plugin->id . '"]', theme('status_messages') . drupal_render($form));
+    $commands[] = ajax_command_alchemist_editing_start($plugin->id);
   }
+  else{
 
-  if($messages = theme('status_messages')){
-    $commands[] = ajax_command_html('#alchemist-messages', $messages);
+    $commands = array();
+    $commands[] = ajax_command_alchemist_editing_stop();
+
+    $fields = $plugin->node->alchemist_fields[$plugin->fieldName];
+    foreach($fields as $plugin){
+      $output = $plugin->render();
+      if(!empty($output)){
+        // $commands[] = ajax_command_html('#' . $plugin->id, drupal_render($output));
+        $commands[] = ajax_command_replace('*[data-alc-id="' . $plugin->id . '"]', drupal_render($output));
+      }
+    }
+
+    if($messages = theme('status_messages')){
+      $commands[] = ajax_command_html('#alchemist-messages', $messages);
+    }
   }
 
   return array('#type' => 'ajax', '#commands' => $commands);

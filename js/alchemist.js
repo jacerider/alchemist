@@ -83,9 +83,9 @@ Drupal.ajax.prototype.commands.alchemistEditingStop = function (ajax, response, 
  * Command to insert new content into eXo.
  */
 Drupal.ajax.prototype.commands.alchemistEdit = function (ajax, response, status) {
-  console.log('ajax', ajax);
-  console.log('response', response);
-  console.log('status', status);
+  // console.log('ajax', ajax);
+  // console.log('response', response);
+  // console.log('status', status);
   // var settings = response.settings || ajax.settings || Drupal.settings;
   // $('#exo-content').exoFrame('paneHide').exoFrame('insertHtml', response.data);
 };

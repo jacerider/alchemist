@@ -7,7 +7,7 @@ class alchemistField_title extends alchemistField {
    * when an empty field is displayed on the alchemist edit page.
    */
   protected function defaultPlaceholder(){
-    return ucfirst(strtolower($this->nodeType->title_label . ' of this ' . $this->nodeType->name));
+    return alchemist_node_scaffold_title($this->node->type);
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -16,7 +16,11 @@ class alchemistField_title extends alchemistField {
 
   public function editForm($form, &$form_state){
     $form = parent::editForm($form, $form_state);
+    if($this->node->title == $this->defaultPlaceholder()){
+      $this->node->title = '';
+    }
     $form['title'] = array(
+      '#title' => t('Title'),
       '#type' => 'textfield',
       '#default_value' => $this->node->title,
       '#required' => TRUE,

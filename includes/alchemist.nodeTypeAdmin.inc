@@ -31,6 +31,27 @@ function alchemist_form_node_type_form_alter(&$form, $form_state) {
       ),
     );
 
+    $options = array();
+    $enabled = array();
+    foreach(field_info_instances('node', $bundle) as $field_name => $instance){
+      $options[$field_name] = $instance['label'];
+      if(!empty($instance['settings']['alchemist']['status'])){
+        $enabled[] = $field_name;
+      }
+    }
+    $form['alchemist']['fields'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Bulk enabled fields'),
+      '#options' => $options,
+      '#default_value' => $enabled,
+      '#description' => t('Each field can also be enabled individually when editing its instance settings. Enabling fields here will set them up to use the default settings. More options are available for each instance on their full field edit page.'),
+      '#states' => array(
+        'visible' => array(
+          'input[name="alchemist[status]"]' => array('checked' => TRUE),
+        ),
+      ),
+    );
+
     array_unshift($form['#submit'], 'alchemist_node_type_form_submit');
   }
 }
@@ -53,7 +74,9 @@ function alchemist_node_type_form_submit($form, &$form_state) {
   if(!$current || $current['status'] != $new['status']){
     // If Alchemist has just been enabled.
     if($new['status'] == 1){
-      $node = alchemist_node_scaffold_create($bundle);
+      $user = user_load(1);
+      $node = alchemist_node_scaffold($bundle, $user, t('Alchemist !type scaffold', array('!type' => $bundle)));
+      node_save($node);
       $new['nid'] = $node->nid;
 
       // Store all scaffold ids as their own variable for quick access as they
@@ -83,36 +106,21 @@ function alchemist_node_type_form_submit($form, &$form_state) {
     variable_del('alchemist_' . $bundle);
   }
   else{
+    $instances = field_info_instances('node', $bundle);
+    foreach($new['fields'] as $field_name => $enabled){
+      $instance = $instances[$field_name];
+      $instance['settings']['alchemist']['status'] = isset($instance['settings']['alchemist']['status']) ? $instance['settings']['alchemist']['status'] : 0;
+      if($instance['settings']['alchemist']['status'] != !empty($enabled)){
+        $instance['settings']['alchemist']['status'] = !empty($enabled);
+        field_update_instance($instance);
+      }
+    }
+    unset($new['fields']);
+
     // Save variable if Alchemist is enabled.
     variable_set('alchemist_' . $bundle, $new);
   }
 
   // Remove to prevent Drupal from re-saving this value.
   unset($form_state['values']['alchemist']);
-}
-
-/**
- * Create a new node that will act as the scaffolding for new Alchemist-created
- * nodes.
- *
- * @param [string] $bundle
- *   The node bundle name.
- *
- * @return [object]
- *   A node object.
- */
-function alchemist_node_scaffold_create($bundle){
-  $user = user_load(1);
-  $values = array(
-    'type' => $bundle,
-    'uid' => $user->uid,
-    'status' => 1,
-    'promote' => 0,
-  );
-  $entity = entity_create('node', $values);
-  $wrapper = entity_metadata_wrapper('node', $entity);
-  $wrapper->title->set(t('Alchemist !type scaffold', array('!type' => $bundle)));
-  $wrapper->log->set('alchemist');
-  $wrapper->save();
-  return $entity;
 }

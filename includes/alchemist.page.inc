@@ -48,10 +48,9 @@ function alchemist_page_edit($node, $view_mode = 'full'){
 
 
 function alchemist_preprocess_page_title(&$vars){
-  drupal_set_title($vars['node']->title);
   $plugin = alchemist_get_field_plugin($vars['node'], 'title', t('Title'));
   $element = $plugin->preprocess(array());
-  $element['#markup'] = '<div class="node-title">' . drupal_get_title() . '</div>';
+  $element['#markup'] = '<div class="node-title">' . render($plugin->render()) . '</div>';
   // $element['#attached']['js'][] = drupal_get_path('module','alchemist') . '/js/alchemistField_title.js';
   return drupal_render($element);
 }

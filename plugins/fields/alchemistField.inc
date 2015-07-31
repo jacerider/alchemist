@@ -26,6 +26,7 @@ class alchemistField {
   public function __construct($type, $args = array()) {
     $this->node = $args[0];
     $this->nodeType = node_type_get_type($this->node->type);
+    $this->wrapper = entity_metadata_wrapper('node', $this->node);
     $this->field = $args[1];
     $this->instance = $args[2];
     $this->fieldName = $this->field['field_name'];
